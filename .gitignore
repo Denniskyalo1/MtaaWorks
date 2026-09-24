@@ -1,0 +1,24 @@
+# Python / ML service
+ml-service/venv/
+ml-service/venv_old/
+ml-service/data/*.csv
+ml-service/models/*.pkl
+ml-service/model/*.pkl
+__pycache__/
+*.pyc
+
+# Backend (Laravel)
+backend/vendor/
+backend/.env
+backend/node_modules/
+backend/storage/*.key
+
+# Mobile (Flutter)
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugin-dependencies
+
+# OS/editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
