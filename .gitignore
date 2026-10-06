@@ -3,7 +3,8 @@ ml-service/venv/
 ml-service/venv_old/
 ml-service/data/*.csv
 ml-service/models/*.pkl
-ml-service/model/*.pkl
+ml-service/figures/
+ml-service/models/model_meta.json
 __pycache__/
 *.pyc
 
