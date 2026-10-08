@@ -1,8 +1,6 @@
 """Parse a password-protected M-Pesa statement, validate it and print the nine
 scoring features. Prints no names, numbers, receipts or transaction details.
 
-Usage (from the ml-service folder, venv active):
-    python tools\\run_parser.py "C:\\path\\to\\statement.pdf"
 """
 import getpass
 import json
@@ -22,7 +20,15 @@ def main(path):
     print("summary totals found:", v.totals_checked)
     print("Paid In total matches summary:", v.paid_in_matches)
     print("Withdrawn total matches summary:", v.paid_out_matches)
-    print("balance continuity breaks:", v.balance_breaks)
+    print("balance breaks, row by row:", v.balance_breaks)
+    print("balance breaks, per completion time (tolerates the order of rows sharing a time):", v.group_breaks)
+    if v.group_breaks:
+        common = [(w, c) for w, c in v.group_break_wording.items() if c >= 3]
+        rare = sum(c for w, c in v.group_break_wording.items() if c < 3)
+        print("  rows in the groups that still do not follow (generic wording, 3+ times):")
+        for w, c in common:
+            print(f"  {c:6d}  {w}")
+        print(f"  {rare:6d}  (rarer wording, not shown)")
     for note in v.notes:
         print("note:", note)
     print("RESULT:", "PASS" if v.passed else "CHECK NEEDED")

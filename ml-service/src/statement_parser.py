@@ -1,19 +1,7 @@
 """M-Pesa statement parser.
-
 Reads the transaction table from a password-protected M-Pesa statement PDF,
 checks it against the statement's own summary totals, and turns it into the
 nine behavioural features used by the credit scoring model.
-
-Design decisions (each is explained in Chapter 5):
-  * Only full calendar months are used when the statement covers 3 or more
-    months, because the first and last months of a statement are usually partial.
-  * Fee rows ("... Charge") count towards money going out but are not counted as
-    transactions, and are never treated as bill payments.
-  * Moves between the user's own M-Shwari / unit-trust savings, loan disbursements,
-    Fuliza draws and reversals are not treated as income.
-  * A feature that cannot be computed (for example loan repayment regularity for
-    someone with no loans) is returned as None and, when scoring, replaced by the
-    training average and reported as imputed.
 """
 import re
 from dataclasses import dataclass, field
@@ -64,6 +52,11 @@ def read_statement(path, password):
     return df, summary
 
 
+def _wording(details, n=3):
+    """First few generic words of a Details text (letters only), used for privacy-safe summaries."""
+    return " ".join(re.sub(r"[^a-z ]", " ", (details or "").lower()).split()[:n])
+
+
 def classify(details, paid_in, withdrawn):
     """Label a row using the generic wording at the start of its Details text."""
     norm = " ".join(re.sub(r"[^a-z ]", " ", (details or "").lower()).split())
@@ -101,11 +94,30 @@ class Validation:
     paid_in_matches: bool = False
     paid_out_matches: bool = False
     balance_breaks: int = 0
+    break_wording: dict = field(default_factory=dict)
+    group_breaks: int = 0
+    group_break_wording: dict = field(default_factory=dict)
     notes: list = field(default_factory=list)
 
     @property
     def passed(self):
         return self.rows > 0 and self.totals_checked and self.paid_in_matches and self.paid_out_matches
+
+
+def _group_breaks(ordered):
+    """Balance check per completion time, tolerant of the order of rows that share a time.
+    Returns (number of failing groups, details of the rows in failing groups)."""
+    groups = [(g["balance"].iloc[0], g["balance"].iloc[-1], g["paid_in"].sum(), g["withdrawn"].sum(),
+               g["details"].tolist()) for _, g in ordered.groupby("time", sort=False)]
+    failing, details = 0, []
+    for i in range(len(groups) - 1):
+        first, last, money_in, money_out, rows = groups[i]
+        older = groups[i + 1]
+        expected = [b + money_in - money_out for b in (older[0], older[1])]
+        if not any(abs(e - b) <= 0.01 for e in expected for b in (first, last)):
+            failing += 1
+            details += rows
+    return failing, details
 
 
 def validate(df, summary):
@@ -123,7 +135,15 @@ def validate(df, summary):
     # balance continuity: newest first, so balance[i] = balance[i+1] + paid_in[i] - withdrawn[i]
     ordered = df.sort_values("time", ascending=False, kind="stable").reset_index(drop=True)
     expected = ordered["balance"].shift(-1) + ordered["paid_in"] - ordered["withdrawn"]
-    v.balance_breaks = int(((expected - ordered["balance"]).abs() > 0.01)[:-1].sum())
+    broken = ((expected - ordered["balance"]).abs() > 0.01)
+    broken.iloc[-1] = False  # the oldest row has nothing before it to compare with
+    v.balance_breaks = int(broken.sum())
+    wording = ordered.loc[broken, "details"].map(_wording)
+    v.break_wording = wording.value_counts().to_dict()
+    # Rows with the same completion time (a payment and its fee, for example) can appear in
+    # either order, so also check the balance once per completion time.
+    v.group_breaks, group_details = _group_breaks(ordered)
+    v.group_break_wording = pd.Series(group_details).map(_wording).value_counts().to_dict() if group_details else {}
     return v
 
 

@@ -98,3 +98,31 @@ def test_fuliza_and_loan_features():  # TC-P06
     assert abs(f["fuliza_usage_frequency"] - 4 / 3) < 1e-9   # 4 draws over 3 full months
     assert abs(f["loan_repayment_regularity"] - 2 / 3) < 1e-9  # repaid in Feb and Apr only
     assert f["avg_monthly_inflow"] == 1000 / 3           # Fuliza draws are not income
+
+
+def test_balance_breaks_are_counted_by_wording():  # TC-P07
+    rows = [  # newest first: a Fuliza draw that does not change the wallet balance, then normal rows
+        ("2026-03-03 10:00:00", "OverDraft of Credit Party", 500, 0, 1000.0),
+        ("2026-03-02 10:00:00", "Customer Transfer to - X", 0, 100, 1000.0),
+        ("2026-03-01 10:00:00", "Funds received from - X", 1100, 0, 1100.0),
+        ("2026-02-28 10:00:00", "Funds received from - X", 0, 0, 0.0),
+    ]
+    df = pd.DataFrame(rows, columns=["time", "details", "paid_in", "withdrawn", "balance"])
+    df["time"] = pd.to_datetime(df["time"])
+    v = validate(df, None)
+    assert v.balance_breaks == 1
+    assert v.break_wording == {"overdraft of credit": 1}
+
+
+def test_rows_sharing_a_time_in_either_order_are_not_breaks():  # TC-P08
+    rows = [  # newest first; the payment (bal 900) is listed above its fee (bal 890) at the same time
+        ("2026-03-02 10:00:00", "Customer Transfer to - X", 0, 100, 900.0),
+        ("2026-03-02 10:00:00", "Customer Transfer of Funds Charge", 0, 10, 890.0),
+        ("2026-03-01 10:00:00", "Funds received from - X", 1000, 0, 1000.0),
+        ("2026-02-28 10:00:00", "Funds received from - X", 0, 0, 0.0),
+    ]
+    df = pd.DataFrame(rows, columns=["time", "details", "paid_in", "withdrawn", "balance"])
+    df["time"] = pd.to_datetime(df["time"])
+    v = validate(df, None)
+    assert v.balance_breaks >= 1      # row by row, the order looks wrong
+    assert v.group_breaks == 0        # per completion time, the balances agree

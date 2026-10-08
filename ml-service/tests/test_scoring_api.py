@@ -1,6 +1,6 @@
 """Scoring-service tests. Run from the ml-service folder:
     python -m pytest tests -v
-(requires: python -m pip install pytest httpx)"""
+"""
 import sys
 from pathlib import Path
 
