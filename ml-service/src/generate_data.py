@@ -7,8 +7,7 @@ N = 5000  # synthetic borrowers
 def generate_dataset(n=N):
     df = pd.DataFrame()
 
-    # 'reliability' now only shapes how the visible features correlate with
-    # each other (realistic), but does NOT leak directly into the outcome
+    
     reliability = np.random.beta(2, 2, n)
 
     df["avg_monthly_inflow"] = np.random.lognormal(mean=9.5, sigma=0.6, size=n)
@@ -21,9 +20,7 @@ def generate_dataset(n=N):
     df["account_age_months"] = np.random.randint(3, 60, n)
     df["transaction_count_monthly"] = np.random.poisson(35, n)
 
-    # Outcome is now a direct function of the OBSERVABLE features only —
-    # this is the key change. The signal the model needs to learn actually
-    # exists in the data it can see.
+   
     default_logit = (
         0.1
         + 1.6 * df["inflow_volatility"]
