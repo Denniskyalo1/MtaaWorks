@@ -12,6 +12,7 @@ backend/vendor/
 backend/.env
 backend/node_modules/
 backend/storage/*.key
+laravel/database/*.sqlite
 
 # Mobile (Flutter)
 mobile/build/
