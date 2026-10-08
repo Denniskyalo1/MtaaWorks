@@ -1,0 +1,56 @@
+{
+  "model_version": "1.0.0",
+  "model_name": "Logistic Regression",
+  "feature_names": [
+    "avg_monthly_inflow",
+    "inflow_volatility",
+    "outflow_to_inflow_ratio",
+    "fuliza_usage_frequency",
+    "loan_repayment_regularity",
+    "savings_deposit_frequency",
+    "bill_payment_consistency",
+    "account_age_months",
+    "transaction_count_monthly"
+  ],
+  "decision_threshold": 0.26,
+  "tier_1_cutoff": 89.34986386331565,
+  "tier_2_cutoff": 80.22437044254059,
+  "training_ranges": {
+    "avg_monthly_inflow": [
+      1694.3465880025203,
+      131141.27020906424
+    ],
+    "inflow_volatility": [
+      0.02,
+      0.8127558891656778
+    ],
+    "outflow_to_inflow_ratio": [
+      0.2,
+      1.2608562375502357
+    ],
+    "fuliza_usage_frequency": [
+      0.0,
+      15.667679993787168
+    ],
+    "loan_repayment_regularity": [
+      0.0,
+      1.0
+    ],
+    "savings_deposit_frequency": [
+      0.0,
+      10.163779722157914
+    ],
+    "bill_payment_consistency": [
+      0.0,
+      1.0
+    ],
+    "account_age_months": [
+      3.0,
+      59.0
+    ],
+    "transaction_count_monthly": [
+      16.0,
+      58.0
+    ]
+  }
+}
