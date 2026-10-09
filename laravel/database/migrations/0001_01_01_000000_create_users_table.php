@@ -13,8 +13,22 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            
+            //User details
             $table->string('name');
             $table->string('email')->unique();
+            $table ->string('phone_number')->nullable()->unique();
+
+            //National ID
+            $table->text('national_id')->unique();
+            $table->char('national_id_hash', 64)->nullable()->unique();
+
+            //Identity verification
+            $table->string('identity_verification_status')->default('pending');
+            $table->string('identity_verification_method')->nullable();
+            $table->timestamp('identity_verified_at')->nullable();
+
+           //Laravel authentication
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
