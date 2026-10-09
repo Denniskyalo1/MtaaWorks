@@ -22,6 +22,7 @@ import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pdfminer.pdfdocument import PDFPasswordIncorrect
 from pydantic import BaseModel, Field
+from scalar_fastapi import add_scalar_reference
 
 from src.statement_parser import read_statement, validate, compute_features, features_for_scoring
 
@@ -47,7 +48,11 @@ app = FastAPI(
                 "three score drivers for one borrower's M-Pesa-derived features, either supplied "
                 "directly or extracted from a consented M-Pesa statement.",
     version=META["model_version"],
+    docs_url=None,
+    redoc_url=None,
 )
+
+add_scalar_reference(app, route="/docs")
 
 
 class BorrowerFeatures(BaseModel):
