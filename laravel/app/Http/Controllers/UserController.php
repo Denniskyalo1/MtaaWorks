@@ -51,9 +51,10 @@ class UserController extends Controller
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
             'national_id' => $normalizedNationalId,
-            'national_id_hash' => $nationalIdHash,
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
         ]);
+
+        $user->sendEmailVerificationNotification();
 
           return response()->json([
             'message' => 'Registration successful.',
