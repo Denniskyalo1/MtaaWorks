@@ -46,15 +46,16 @@ return [
          * API version.
          */
         'version' => env('API_VERSION', '0.0.1'),
+        'title' => null,
 
         /*
          * Description rendered on the home page of the API documentation (`/docs/api`).
          */
-        'description' => '',
+        'description' => file_get_contents(base_path('docs/api_description.md')) ?: null,
     ],
 
     'ui' => [
-        'title' => null,
+        'title' => 'MtaaWorks',
     ],
 
     /*

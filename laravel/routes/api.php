@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +20,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [UserController::class, 'logout']);
-});
+
+//Protected routes that require authentication
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/logout', [UserController::class, 'logout']);
+        Route::get('/show', [ProfileController::class, 'show']);
+        Route::patch('/update',[ProfileController::class, 'update']);
+        Route::post('/change-password', [PasswordResetController::class, 'changePassword']);
+    });
