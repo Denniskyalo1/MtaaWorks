@@ -62,4 +62,6 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::post('/change-password', [PasswordResetController::class, 'changePassword']);
         Route::get('/email/verification-status',[EmailVerificationController::class, 'status']);
         Route::post('/email/verification-notification',[EmailVerificationController::class, 'resend'])->middleware('throttle:6,1');
+        Route::post('/profile/complete', [ProfileController::class, 'complete']);
+
     });

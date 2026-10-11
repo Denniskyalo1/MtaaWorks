@@ -6,6 +6,7 @@ use App\Models\User;
 use Google\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class GoogleAuthController extends Controller
 {
@@ -23,11 +24,16 @@ class GoogleAuthController extends Controller
         // 1. Verify the token with Google
         $client = new Client(['client_id' => config('services.google.client_id')]);
 
-        try {
-            $payload = $client->verifyIdToken($request->input('id_token'));
-        } catch (\Throwable $e) {
-            $payload = null;
-        }
+           try {
+       $payload = $client->verifyIdToken($request->input('id_token'));
+   } catch (\Throwable $e) {
+       Log::error('Google verify threw: ' . $e->getMessage());
+       $payload = null;
+   }
+
+   if (!$payload) {
+       Log::warning('Google verifyIdToken returned no payload');
+   }
 
         if (!$payload || !($payload['email_verified'] ?? false)) {
             return response()->json(['message' => 'Invalid Google token.'], 401);
@@ -60,7 +66,7 @@ class GoogleAuthController extends Controller
         return response()->json([
             'token' => $user->createToken('mobile')->plainTextToken,
             'user' => $user,
-            'needs_profile_completion' => is_null($user->national_id) || is_null($user->phone_number),
-        ]);
+            'needs_profile_completion' => is_null($user->national_id),
+      ]);
     }
 }
