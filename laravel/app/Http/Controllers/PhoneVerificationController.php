@@ -33,7 +33,7 @@ class PhoneVerificationController extends Controller
         DB::table('phone_verification_codes')->insert([
             'user_id' => $user->id,
             'phone_number' => $user->phone_number,
-            'code_hash' => Hash_hmac('sha256', $code, config('app.key')),
+            'code_hash' => hash_hmac('sha256', $code, config('app.key')),
             'attempts' => 0,
             'expires_at' => now()->addMinutes(10),
             'created_at' => now(),

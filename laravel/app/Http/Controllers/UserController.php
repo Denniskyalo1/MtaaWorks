@@ -46,18 +46,19 @@ class UserController extends Controller
             ], 422);
         }
 
-       $user = User::create([
+       $user = new User([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
-            'national_id' => $normalizedNationalId,
-            'password' => $validated['password'],
         ]);
+        $user->national_id = $normalizedNationalId;
+        $user->password =$validated['password'];
+        $user->save();
 
         $user->sendEmailVerificationNotification();
 
           return response()->json([
-            'message' => 'Registration successful.',
+            'message' => 'Registration successful. A verification email has been sent to your email address.',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,

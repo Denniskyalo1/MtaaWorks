@@ -37,7 +37,13 @@ return [
     'api_key'   => env('AT_API_KEY'),
     'sandbox'   => env('AT_SANDBOX', true),
     'sender_id' => env('AT_SENDER_ID'),
+   ],
+
+   'korapay' => [
+    'secret_key' => env('KORAPAY_SECRET_KEY'),
+    'base_url'   => env('KORAPAY_BASE_URL', 'https://api.korapay.com'),
 ],
+
 
     'slack' => [
         'notifications' => [
