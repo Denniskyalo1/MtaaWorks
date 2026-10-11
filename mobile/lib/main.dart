@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-void main() {
+const webClientId = '119754582933-9fnt70919vmjseau0ronuc7kq08coke1.apps.googleusercontent.com';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await GoogleSignIn.instance.initialize(serverClientId: webClientId);
   runApp(const MyApp());
 }
 
@@ -66,6 +73,30 @@ class _MyHomePageState extends State<MyHomePage> {
       _counter++;
     });
   }
+  Future<void> _signInWithGoogle() async {
+    try {
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        debugPrint('No ID token');
+        return;
+      }
+
+      final res = await http.post(
+        Uri.parse('http://10.0.2.2:8000/api/auth/google'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'id_token': idToken}),
+      );
+
+      debugPrint('LARAVEL STATUS: ${res.statusCode}');
+      debugPrint('LARAVEL BODY: ${res.body}');
+    } catch (e) {
+      debugPrint('SIGN-IN ERROR: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +140,12 @@ class _MyHomePageState extends State<MyHomePage> {
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
+            ElevatedButton(
+              onPressed: _signInWithGoogle,
+              child: const Text('Sign in with Google'),
+            ),
           ],
+
         ),
       ),
       floatingActionButton: FloatingActionButton(
