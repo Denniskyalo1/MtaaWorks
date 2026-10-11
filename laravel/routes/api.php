@@ -1,11 +1,11 @@
 <?php
 
+use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\EmailVerificationController;
 
 /**
  * User Routes
@@ -22,6 +22,7 @@ Route::post('/login', [UserController::class, 'login']);
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->name('password.email');
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.reset');
+Route::post('/auth/google', [GoogleAuthController::class, 'login']);
 
 //Temporary for testing till front end is built
 /*

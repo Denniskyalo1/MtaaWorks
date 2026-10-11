@@ -3,10 +3,7 @@
 namespace App\Models;
 
 use Laravel\Sanctum\HasApiTokens; 
-use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -61,7 +58,7 @@ class User extends Authenticatable implements MustVerifyEmail
         $normalized = trim($value);
 
         $this->attributes['national_id'] = Crypt::encryptString($normalized);
-        $this->attributes['national_id_hash'] = hash('sha256', $normalized);
+        $this->attributes['national_id_hash'] = hash_hmac('sha256', $normalized, config('app.key'));
     }
 
      /**
