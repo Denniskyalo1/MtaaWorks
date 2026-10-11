@@ -32,6 +32,13 @@ return [
        'client_id' => env('GOOGLE_CLIENT_ID'),
    ],
 
+   'africastalking' => [
+    'username'  => env('AT_USERNAME'),
+    'api_key'   => env('AT_API_KEY'),
+    'sandbox'   => env('AT_SANDBOX', true),
+    'sender_id' => env('AT_SENDER_ID'),
+],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -50,6 +50,11 @@ class ProfileController extends Controller
     $validated = $request->validated();
 
     $user->update($validated);
+
+    if ($user->wasChanged('email')) {
+       $user->sendEmailVerificationNotification();
+    }
+    
     $user->refresh();
 
     return response()->json([

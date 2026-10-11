@@ -6,13 +6,17 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PhoneVerificationController;
+
+
+/*
+ Route::get('/user', function (Request $request) {
+   return $request->user();
+  })->middleware('auth:sanctum');
+
+  */
 
 /**
- * User Routes
- * Route::get('/user', function (Request $request) {
-   * return $request->user();
-  *})->middleware('auth:sanctum');
-
  *
  * Routes for handling user-related actions, such as registration.
  * 
@@ -21,7 +25,7 @@ Route::post('/register', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->name('password.email');
-Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.reset');
+Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.reset')->middleware('throttle:6,1');
 Route::post('/auth/google', [GoogleAuthController::class, 'login']);
 
 //Temporary for testing till front end is built
@@ -63,5 +67,7 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::get('/email/verification-status',[EmailVerificationController::class, 'status']);
         Route::post('/email/verification-notification',[EmailVerificationController::class, 'resend'])->middleware('throttle:6,1');
         Route::post('/profile/complete', [ProfileController::class, 'complete']);
+        Route::post('/phone/send-code', [PhoneVerificationController::class, 'sendCode'])->middleware('throttle:3,1');
+        Route::post('/phone/verify', [PhoneVerificationController::class, 'verify'])->middleware('throttle:5,1');
 
     });

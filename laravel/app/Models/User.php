@@ -41,7 +41,19 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'identity_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void{
+    static::updating(function (User $user) {
+        if ($user->isDirty('phone_number')) {
+            $user->phone_verified_at = null;
+        }
+        if($user->isDirty('email')){
+            $user->email_verified_at = null;
+        }
+    });
     }
     
     /**
