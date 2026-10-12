@@ -6,8 +6,8 @@ Interactive docs: http://127.0.0.1:8000/docs
 
 Endpoints
     GET  /health           service status
-    POST /score            nine behavioural features -> score, tier, top drivers
-    POST /score-statement  password-protected M-Pesa statement PDF -> features -> score
+    POST /score            (needs X-Service-Key) nine features -> score, tier, top drivers
+    POST /score-statement  (needs X-Service-Key) statement PDF -> features -> score
 
 Privacy: an uploaded statement is read in memory, is never written to disk, and neither the
 file, the password nor any transaction detail is logged or returned. Only summary features
@@ -15,15 +15,15 @@ and validation counts leave the service. Use HTTPS if this is ever deployed beyo
 """
 import io
 import json
+import os
+import hmac
 from pathlib import Path
-
 import joblib
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from pdfminer.pdfdocument import PDFPasswordIncorrect
 from pydantic import BaseModel, Field
 from scalar_fastapi import add_scalar_reference
-
 from src.statement_parser import read_statement, validate, compute_features, features_for_scoring
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
@@ -151,13 +151,18 @@ def score_values(values: dict) -> ScoreResponse:
 def health():
     return {"status": "ok", "model_version": META["model_version"], "model": META["model_name"]}
 
+def require_service_key(x_service_key: str = Header(default="")):
+    expected = os.environ.get("SCORING_SERVICE_KEY", "")
+    if not expected or not hmac.compare_digest(x_service_key.encode(), expected.encode()):
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-@app.post("/score", response_model=ScoreResponse)
+
+@app.post("/score", response_model=ScoreResponse, dependencies=[Depends(require_service_key)])
 def score(features: BorrowerFeatures):
     return score_values(features.model_dump())
 
 
-@app.post("/score-statement", response_model=StatementScoreResponse)
+@app.post("/score-statement", response_model=StatementScoreResponse, dependencies=[Depends(require_service_key)])
 async def score_statement(file: UploadFile = File(...), password: str = Form(...)):
     data = await file.read()
     if len(data) > MAX_UPLOAD_BYTES:
