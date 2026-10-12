@@ -95,6 +95,14 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Consent::class);
      }
 
+     public function statements() { 
+        return $this->hasMany(Statement::class);
+     }
+
+     public function creditScores() { 
+        return $this->hasMany(CreditScore::class);
+     }
+
     /**
      * Get the lender that owns the user.
      */

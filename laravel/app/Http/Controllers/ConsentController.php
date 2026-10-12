@@ -49,9 +49,11 @@ class ConsentController extends Controller
             return response()->json(['message' => 'No active consent for this purpose.'], 404);
         }
 
-        // TODO: delete stored statement data and revoke active score_access_grants once those exist
+        if ($purpose === Consent::STATEMENT_ANALYSIS) {
+            $request->user()->statements()->delete();
+        }       
         return response()->json(['message' => 'Consent revoked.']);
-    }
+        }
 
     
 }

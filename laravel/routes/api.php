@@ -8,7 +8,9 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\UserController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
@@ -57,8 +59,9 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         <button type="submit" style="background: #007bff; color: white; padding: 10px 15px; border: none; cursor: pointer;">Update Password</button>
     </form>
     ';
-})->name('password.reset');
+})->name('password.reset')->middleware('throttle:6,1');
 */
+
 
 
 //Protected routes that require authentication
@@ -81,6 +84,12 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
     });
 
     Route::middleware(['auth:sanctum', 'role:admin', 'throttle:20,1'])->prefix('admin')->group(function () {
-    Route::post('/lenders', [AdminLenderController::class, 'store']);
-    Route::get('/lenders', [AdminLenderController::class, 'index']);
+       Route::post('/lenders', [AdminLenderController::class, 'store']);
+       Route::get('/lenders', [AdminLenderController::class, 'index']);
     });
+
+    Route::middleware(['auth:sanctum', 'role:borrower'])->group(function () {
+      Route::post('/scores', [ScoreController::class, 'store'])->middleware('throttle:5,1');
+      Route::get('/scores', [ScoreController::class, 'index']);
+      Route::get('/scores/latest', [ScoreController::class, 'latest']);
+   });
