@@ -12,8 +12,15 @@ use Illuminate\Support\Facades\Crypt;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
+
+
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+
+    public const ROLE_BORROWER = 'borrower';
+    public const ROLE_LENDER   = 'lender';
+    public const ROLE_ADMIN    = 'admin';
 
     protected $fillable = [
         'name',
@@ -82,5 +89,16 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return Crypt::decryptString($value);
+    }
+
+    public function consents() { 
+        return $this->hasMany(Consent::class);
+     }
+
+    /**
+     * Get the lender that owns the user.
+     */
+    public function lender() {
+         return $this->belongsTo(Lender::class); 
     }
 }

@@ -1,12 +1,15 @@
 <?php
 
-use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AdminLenderController;
+use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\EmailVerificationController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\PhoneVerificationController;
 
 
 /*
@@ -59,7 +62,7 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
 
 
 //Protected routes that require authentication
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'role:borrower'])->group(function () {
         Route::post('/logout', [UserController::class, 'logout']);
         Route::get('/show', [ProfileController::class, 'show']);
         Route::patch('/update',[ProfileController::class, 'update']);
@@ -69,5 +72,15 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::post('/profile/complete', [ProfileController::class, 'complete']);
         Route::post('/phone/send-code', [PhoneVerificationController::class, 'sendCode'])->middleware('throttle:3,1');
         Route::post('/phone/verify', [PhoneVerificationController::class, 'verify'])->middleware('throttle:5,1');
+        Route::post('/account/delete/request',[AccountController::class, 'requestDeletion'])->middleware('throttle:3,1');
+        Route::delete('/account',[AccountController::class, 'deleteAccount'])->middleware('throttle:5,1');
+        Route::get('/consents', [ConsentController::class, 'index']);
+        Route::post('/consents', [ConsentController::class, 'store'])->middleware('throttle:10,1');
+        Route::delete('/consents/{purpose}', [ConsentController::class, 'destroy'])->middleware('throttle:10,1'); 
 
+    });
+
+    Route::middleware(['auth:sanctum', 'role:admin', 'throttle:20,1'])->prefix('admin')->group(function () {
+    Route::post('/lenders', [AdminLenderController::class, 'store']);
+    Route::get('/lenders', [AdminLenderController::class, 'index']);
     });

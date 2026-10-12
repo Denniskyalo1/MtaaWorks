@@ -20,14 +20,14 @@ class UpdateUserRequest extends FormRequest
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
-    public function rules(): array
-    {
-        $user = $this->user();
+        public function rules(): array
+        {
+            $user = $this->user();
 
-        return [
-            'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
-            'phone_number' => 'sometimes|nullable|string|max:20|unique:users,phone_number,' . $user->id,
-        ];
-    }
+            return [
+                'name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
+                'phone_number' => 'sometimes|nullable|string|max:20|unique:users,phone_number,' . $user->id,
+            ];
+        }
 }
