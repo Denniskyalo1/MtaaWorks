@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminLenderController;
+use App\Http\Controllers\BorrowerAccessController;
 use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\GoogleAuthController;
+use App\Http\Controllers\LenderAccessController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\ProfileController;
@@ -80,6 +82,13 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::get('/consents', [ConsentController::class, 'index']);
         Route::post('/consents', [ConsentController::class, 'store'])->middleware('throttle:10,1');
         Route::delete('/consents/{purpose}', [ConsentController::class, 'destroy'])->middleware('throttle:10,1'); 
+        Route::post('/scores', [ScoreController::class, 'store'])->middleware('throttle:5,1');
+        Route::get('/scores', [ScoreController::class, 'index']);
+        Route::get('/scores/latest', [ScoreController::class, 'latest']);
+        Route::get('/access-requests', [BorrowerAccessController::class, 'index']);
+        Route::post('/access-requests/{grant}/approve', [BorrowerAccessController::class, 'approve']);
+        Route::post('/access-requests/{grant}/decline', [BorrowerAccessController::class, 'decline']);
+        Route::post('/access-requests/{grant}/revoke', [BorrowerAccessController::class, 'revoke']);
 
     });
 
@@ -88,8 +97,8 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
        Route::get('/lenders', [AdminLenderController::class, 'index']);
     });
 
-    Route::middleware(['auth:sanctum', 'role:borrower'])->group(function () {
-      Route::post('/scores', [ScoreController::class, 'store'])->middleware('throttle:5,1');
-      Route::get('/scores', [ScoreController::class, 'index']);
-      Route::get('/scores/latest', [ScoreController::class, 'latest']);
+    Route::middleware(['auth:sanctum', 'role:lender'])->prefix('lender')->group(function () {
+        Route::post('/access-requests', [LenderAccessController::class, 'store'])->middleware('throttle:10,1');
+        Route::get('/access-requests', [LenderAccessController::class, 'index']);
+        Route::get('/grants/{grant}/score', [LenderAccessController::class, 'show']);
    });

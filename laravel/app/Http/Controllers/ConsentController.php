@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 
 use App\Models\Consent;
+use App\Models\ScoreAccessGrant;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,7 @@ class ConsentController extends Controller
         }
 
         if ($purpose === Consent::STATEMENT_ANALYSIS) {
+            ScoreAccessGrant::where('user_id', $request->user()->id)->whereIn('status', ['requested', 'approved'])->update(['status' => 'revoked', 'revoked_at' => now()]);
             $request->user()->statements()->delete();
         }       
         return response()->json(['message' => 'Consent revoked.']);

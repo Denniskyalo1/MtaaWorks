@@ -25,6 +25,8 @@ class ScoreController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        set_time_limit(150);
+
         $request->validate([
             'statement' => ['required', 'file', 'mimes:pdf', 'max:10240'],
             'password'  => ['required', 'string', 'max:100'],
@@ -37,7 +39,7 @@ class ScoreController extends Controller
         }
 
         try {
-            $response = Http::timeout(60)
+            $response = Http::timeout(120)
                 ->withHeaders(['X-Service-Key' => config('services.scoring.key')])
                 ->attach('file', file_get_contents($request->file('statement')->getRealPath()), 'statement.pdf')
                 ->post(config('services.scoring.url') . '/score-statement', [
