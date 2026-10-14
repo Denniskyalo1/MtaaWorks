@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:mtaaworks/sign_up_page.dart';
+import 'home_page.dart';
+import 'services/api_service.dart';
+
+import 'landing_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -9,7 +14,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _isLoading = false;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -20,6 +25,82 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.dispose();
     super.dispose();
   }
+
+  Future<void> _login() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email and password.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService.login(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loginWithGoogle() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService.loginWithGoogle();
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -45,9 +126,10 @@ class _LoginPageState extends State<LoginPage> {
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back, color: Colors.black, size: 30),
                     onPressed: () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      }
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LandingPage()),
+                            (route) => false,
+                      );
                     },
                   ),
                 ),
@@ -200,7 +282,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -208,7 +290,16 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(27),
                     ),
                   ),
-                  child: const Text(
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                      : const Text(
                     'Log In',
                     style: TextStyle(
                       fontSize: 16,
@@ -246,7 +337,7 @@ class _LoginPageState extends State<LoginPage> {
                         border: Border.all(color: Colors.grey.shade300),
                       ),
                       child: InkWell(
-                        onTap: () {},
+                        onTap: _isLoading ? null : _loginWithGoogle,
                         borderRadius: BorderRadius.circular(26),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -277,7 +368,12 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context)=>SignUpPage(),
+                        ),
+                      );
+                    },
                     child: const Text(
                       'Sign up',
                       style: TextStyle(

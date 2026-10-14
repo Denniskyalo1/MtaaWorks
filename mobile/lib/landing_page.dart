@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:carousel_slider_plus/carousel_slider_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:mtaaworks/sign_up_page.dart';
 
 import 'login_page.dart';
 
@@ -105,7 +106,12 @@ class _LandingPageState extends State<LandingPage> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context)=>SignUpPage(),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
