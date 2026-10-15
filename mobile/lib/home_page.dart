@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:mtaaworks/profile_page.dart';
 import 'lender_requests_page.dart';
 import 'consent_page.dart';
 import 'services/api_service.dart';
@@ -152,15 +153,7 @@ class _HomePageState extends State<HomePage> {
         )
             : _tab == 1
             ? const LenderRequestsPage()
-            : const Center(
-          child: Text(
-            'Profile',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 16,
-            ),
-          ),
-        ),
+            : const ProfilePage()
       ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: Colors.white,

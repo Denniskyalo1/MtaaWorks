@@ -15,6 +15,8 @@ class SignUpPage extends StatefulWidget {
 class _SignUpPageState extends State<SignUpPage> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -22,7 +24,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
-  bool _isLoading = false;
+
 
   @override
   void dispose() {
@@ -99,9 +101,9 @@ class _SignUpPageState extends State<SignUpPage> {
 
 
   Future<void> _loginWithGoogle() async {
-    if (_isLoading) return;
+    if (_isLoading || _isGoogleLoading) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isGoogleLoading = true);
 
     try {
       await ApiService.loginWithGoogle();
@@ -124,7 +126,7 @@ class _SignUpPageState extends State<SignUpPage> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _isGoogleLoading = false);
       }
     }
   }
@@ -337,7 +339,9 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed: (_isLoading || _isGoogleLoading)
+                      ? null
+                      : _register,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -388,20 +392,35 @@ class _SignUpPageState extends State<SignUpPage> {
                   border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: InkWell(
-                  onTap: _isLoading ? null : _loginWithGoogle,
+                  onTap: (_isLoading || _isGoogleLoading)
+                      ? null
+                      : _loginWithGoogle,
                   borderRadius: BorderRadius.circular(26),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Image.asset(
-                        'images/google.png',
-                        height: 22,
-                        width: 22,
-                      ),
+                      if (_isGoogleLoading)
+                        const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF7C3AED),
+                          ),
+                        )
+                      else
+                        Image.asset(
+                          'images/google.png',
+                          height: 22,
+                          width: 22,
+                        ),
                       const SizedBox(width: 20),
-                      const Text(
-                        'Google',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      Text(
+                        _isGoogleLoading ? 'Signing in...' : 'Google',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
