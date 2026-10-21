@@ -3,6 +3,7 @@ import 'package:mtaaworks/landing_page.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 import 'services/api_service.dart';
+import 'complete_profile_page.dart';
 import 'dart:developer' as developer;
 
 class SignUpPage extends StatefulWidget {
@@ -106,12 +107,26 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isGoogleLoading = true);
 
     try {
-      await ApiService.loginWithGoogle();
+      final response = await ApiService.loginWithGoogle();
 
       if (!mounted) return;
 
+      final user = Map<String, dynamic>.from(
+        response['user'] ?? {},
+      );
+
+      final needsProfileCompletion =
+          response['needs_profile_completion'] == true;
+
+      final Widget destination = needsProfileCompletion
+          ? CompleteProfilePage(
+        googleName: user['name']?.toString() ?? '',
+        googleEmail: user['email']?.toString() ?? '',
+      )
+          : const HomePage();
+
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => destination),
             (route) => false,
       );
     } catch (e) {

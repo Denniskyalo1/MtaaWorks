@@ -840,4 +840,94 @@ class ApiService {
 
 
 
+  static Future<Map<String, dynamic>> completeGoogleProfile({
+    required String nationalId,
+    String? phoneNumber,
+  }) async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception(
+        'Your session has expired. Please sign in again.',
+      );
+    }
+
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/profile/complete'),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'national_id': nationalId.trim(),
+        if (phoneNumber != null && phoneNumber.trim().isNotEmpty)
+          'phone_number': phoneNumber.trim(),
+      }),
+    )
+        .timeout(const Duration(seconds: 30));
+
+    Map<String, dynamic> data;
+
+    try {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException();
+      }
+
+      data = decoded;
+    } on FormatException {
+      throw Exception(
+        'The server returned an unexpected response. '
+            'Please try again.',
+      );
+    }
+
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300) {
+      return data;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception(
+        'Your session has expired. Please sign in again.',
+      );
+    }
+
+    if (response.statusCode == 403) {
+      throw Exception(
+        data['message']?.toString() ??
+            'You are not permitted to complete this profile.',
+      );
+    }
+
+    if (response.statusCode == 409) {
+      throw Exception(
+        data['message']?.toString() ??
+            'Your profile is already complete.',
+      );
+    }
+
+    final errors = data['errors'];
+
+    if (errors is Map && errors.isNotEmpty) {
+      final firstError = errors.values.first;
+
+      if (firstError is List && firstError.isNotEmpty) {
+        throw Exception(firstError.first.toString());
+      }
+    }
+
+    throw Exception(
+      data['message']?.toString() ??
+          'Could not complete your profile.',
+    );
+  }
+
+
+
+
+
 }
