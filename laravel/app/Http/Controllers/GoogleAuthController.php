@@ -66,7 +66,7 @@ class GoogleAuthController extends Controller
         return response()->json([
             'token' => $user->createToken('mobile')->plainTextToken,
             'user' => $user,
-            'needs_profile_completion' => is_null($user->national_id),
+            'needs_profile_completion' => blank($user->national_id),
       ]);
     }
 }

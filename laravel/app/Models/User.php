@@ -82,15 +82,17 @@ class User extends Authenticatable implements MustVerifyEmail
      /**
      * Decrypt national ID when accessing it.
      */
-    public function getNationalIdAttribute(?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        return Crypt::decryptString($value);
+    /**
+ * Decrypt national ID when accessing it.
+ */
+public function getNationalIdAttribute(?string $value): ?string
+{
+    if ($value === null || trim($value) === '') {
+        return null;
     }
 
+    return Crypt::decryptString($value);
+}
     public function consents() { 
         return $this->hasMany(Consent::class);
      }

@@ -85,12 +85,18 @@ public function complete(Request $request): JsonResponse
     }
 
     $validated = $request->validate([
-        'national_id' => 'required|string|max:255',
-        'phone_number' => [
-            'nullable', 'string', 'max:20',
-            Rule::unique('users', 'phone_number')->ignore($user->id),
-        ],
-    ]);
+    'national_id' => [
+        'required',
+        'string',
+        'regex:/^\d{7,8}$/',
+    ],
+    'phone_number' => [
+        'nullable',
+        'string',
+        'regex:/^(?:\+254|254|0)[17]\d{8}$/',
+        Rule::unique('users', 'phone_number')->ignore($user->id),
+    ],
+]);
 
     $normalizedNationalId = trim($validated['national_id']);
     $nationalIdHash = hash_hmac('sha256', $normalizedNationalId, config('app.key'));
