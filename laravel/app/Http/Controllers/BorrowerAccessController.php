@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LoanRequest;
 use App\Models\ScoreAccessGrant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,6 +83,13 @@ class BorrowerAccessController extends Controller
         }
 
         $grant->update(['status' => 'revoked', 'revoked_at' => now()]);
+
+        // ending access to the score also withdraws loan requests that relied on it
+        LoanRequest::where('score_access_grant_id', $grant->id)->where('status', 'pending')->update([
+            'status' => 'withdrawn',
+            'decision_note' => 'The borrower ended access to their score.',
+            'responded_at' => now(),
+        ]);
 
         return response()->json(['message' => 'Access revoked.']);
     }

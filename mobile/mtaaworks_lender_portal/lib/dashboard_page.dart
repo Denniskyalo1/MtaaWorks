@@ -1,4 +1,5 @@
 
+import 'loan_requests_page.dart';
 import 'package:flutter/material.dart';
 
 import 'login_page.dart';
@@ -508,6 +509,13 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoanRequestsPage()),
+            ),
+            icon: const Icon(Icons.request_quote_outlined),
+            label: const Text('Loan requests'),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _isLoading ? null : _loadGrants,

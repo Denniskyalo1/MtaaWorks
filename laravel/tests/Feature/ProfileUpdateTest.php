@@ -13,7 +13,7 @@ class ProfileUpdateTest extends TestCase
 
     public function test_profile_update_ignores_protected_fields(): void
     {
-        $user = User::factory()->create(['identity_verification_status' => 'unverified']);
+        $user = User::factory()->create(['role' => 'borrower', 'identity_verification_status' => 'unverified']);
         $beforeHash = $user->national_id_hash;
         Sanctum::actingAs($user);
 

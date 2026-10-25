@@ -202,14 +202,20 @@ class ApiService {
   }
 
 
-  static Future<Map<String, dynamic>> scoreStatement({
-    required String statementPath,
-    required String password,
+  /// Scores one statement (the same call as before) or several together.
+  /// [passwords] must have one entry for each path, in the same order.
+  static Future<Map<String, dynamic>> scoreStatements({
+    required List<String> statementPaths,
+    required List<String> passwords,
   }) async {
     final token = await getToken();
 
     if (token == null || token.isEmpty) {
       throw Exception('Please log in again.');
+    }
+
+    if (statementPaths.isEmpty || statementPaths.length != passwords.length) {
+      throw Exception('Add a password for each statement.');
     }
 
     final request = http.MultipartRequest(
@@ -222,13 +228,19 @@ class ApiService {
       'Authorization': 'Bearer $token',
     });
 
-    request.fields['password'] = password;
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'statement',
-        statementPath,
-      ),
-    );
+    if (statementPaths.length == 1) {
+      request.fields['password'] = passwords.first;
+      request.files.add(
+        await http.MultipartFile.fromPath('statement', statementPaths.first),
+      );
+    } else {
+      for (var i = 0; i < statementPaths.length; i++) {
+        request.fields['passwords[$i]'] = passwords[i];
+        request.files.add(
+          await http.MultipartFile.fromPath('statements[$i]', statementPaths[i]),
+        );
+      }
+    }
 
     final streamedResponse = await request.send().timeout(
       const Duration(seconds: 130),
@@ -930,4 +942,89 @@ class ApiService {
 
 
 
+
+  // ---------------------------------------------------------------- loan requests
+
+  static Future<Map<String, dynamic>> _authedJson(
+      String method,
+      String path, {
+        Map<String, dynamic>? body,
+        required String fallbackError,
+      }) async {
+    final token = await getToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Please log in again.');
+    }
+
+    final headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    final uri = Uri.parse('$baseUrl$path');
+
+    final response = method == 'GET'
+        ? await http.get(uri, headers: headers)
+        : await http.post(uri, headers: headers, body: jsonEncode(body ?? {}));
+
+    final dynamic decoded = jsonDecode(response.body);
+
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Unexpected response from the server.');
+    }
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded;
+    }
+
+    if (response.statusCode == 401) {
+      throw Exception('Your session has expired. Please log in again.');
+    }
+
+    final errors = decoded['errors'];
+    if (errors is Map && errors.isNotEmpty) {
+      final first = errors.values.first;
+      if (first is List && first.isNotEmpty) {
+        throw Exception(first.first.toString());
+      }
+    }
+
+    throw Exception(decoded['message']?.toString() ?? fallbackError);
+  }
+
+  static Future<Map<String, dynamic>> getLenders() =>
+      _authedJson('GET', '/lenders', fallbackError: 'Failed to load lenders.');
+
+  static Future<Map<String, dynamic>> getLoanRequests() => _authedJson(
+    'GET',
+    '/loan-requests',
+    fallbackError: 'Failed to load your loan requests.',
+  );
+
+  static Future<Map<String, dynamic>> createLoanRequest({
+    required int lenderId,
+    required num amount,
+    required int termMonths,
+    String? purpose,
+    bool shareDrivers = false,
+  }) =>
+      _authedJson(
+        'POST',
+        '/loan-requests',
+        body: {
+          'lender_id': lenderId,
+          'amount': amount,
+          'term_months': termMonths,
+          if (purpose != null && purpose.trim().isNotEmpty) 'purpose': purpose.trim(),
+          'scope': shareDrivers ? 'score_tier_drivers' : 'score_tier',
+        },
+        fallbackError: 'The loan request could not be sent.',
+      );
+
+  static Future<Map<String, dynamic>> withdrawLoanRequest(int id) => _authedJson(
+    'POST',
+    '/loan-requests/$id/withdraw',
+    fallbackError: 'The loan request could not be withdrawn.',
+  );
 }

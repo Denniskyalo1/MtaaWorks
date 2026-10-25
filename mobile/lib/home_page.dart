@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mtaaworks/profile_page.dart';
 import 'lender_requests_page.dart';
 import 'consent_page.dart';
+import 'loan_pages.dart';
 import 'services/api_service.dart';
 
 const int _pendingRequests = 2;
@@ -469,6 +470,35 @@ class _HomeBody extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(27),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 54,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoanRequestsPage()),
+                );
+              },
+              icon: const Icon(Icons.request_quote_outlined, color: _purple),
+              label: const Text(
+                'Loan requests',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: _purple,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: _purple, width: 1.2),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(27),
                 ),

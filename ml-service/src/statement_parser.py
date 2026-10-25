@@ -3,12 +3,16 @@ Reads the transaction table from a password-protected M-Pesa statement PDF,
 checks it against the statement's own summary totals, and turns it into the
 nine behavioural features used by the credit scoring model.
 """
+import os
 import re
+import threading
 from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
-import pdfplumber
+from pdfminer.pdfdocument import PDFPasswordIncorrect
+
+from src import pdf_rows
 
 RECEIPT = re.compile(r"^[A-Z0-9]{10}$")
 TIME = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
@@ -31,25 +35,66 @@ def _clean(cell):
     return (cell or "").replace("\n", " ").strip()
 
 
-def read_statement(path, password):
-    """Return (transactions DataFrame, summary totals dict or None)."""
-    rows, summary = [], None
-    with pdfplumber.open(path, password=password) as pdf:
-        for page in pdf.pages:
-            for table in page.extract_tables():
-                for r in table:
-                    cells = [_clean(c) for c in r]
-                    if len(cells) == 7 and RECEIPT.match(cells[0]) and TIME.match(cells[1]):
-                        rows.append(cells)
-                    elif summary is None and len(cells) >= 3 and cells[0].upper().startswith("TOTAL"):
-                        summary = {"paid_in": _num(cells[1]), "paid_out": _num(cells[2])}
+def _frame(rows):
     df = pd.DataFrame(rows, columns=["receipt", "time", "details", "status", "paid_in", "withdrawn", "balance"])
     df["time"] = pd.to_datetime(df["time"])
     df["paid_in"] = df["paid_in"].map(_num)
     df["withdrawn"] = df["withdrawn"].map(_num).abs()
     df["balance"] = df["balance"].map(_num)
     df["kind"] = [classify(d, i, w) for d, i, w in zip(df["details"], df["paid_in"], df["withdrawn"])]
-    return df, summary
+    return df
+
+
+def _totals_agree(df, summary):
+    return (summary is not None and not df.empty
+            and abs(df["paid_in"].sum() - summary["paid_in"]) < 0.01
+            and abs(df["withdrawn"].sum() - summary["paid_out"]) < 0.01)
+
+
+_state = threading.local()
+
+
+def last_read_method():
+    """Which reader produced the most recent result on this thread ("fast", "reliable" or None)."""
+    return getattr(_state, "method", None)
+
+
+def read_statement(source, password, method=None):
+    """Return (transactions DataFrame, summary totals dict or None).
+
+    `source` is a path or a file-like object. The fast reader is tried first and is accepted only
+    when the rows it read add up to the statement's own TOTAL row. Otherwise the original
+    pdfplumber reader is used, so a layout the fast reader does not understand costs time, not
+    correctness. method: "fast", "reliable" or None (automatic; the STATEMENT_PARSER environment
+    variable can also set it). last_read_method() reports which reader produced the result.
+    """
+    _state.method = None
+    if hasattr(source, "read"):
+        data = source.read()
+    else:
+        with open(source, "rb") as fh:
+            data = fh.read()
+    method = method or os.environ.get("STATEMENT_PARSER", "auto")
+    try:
+        if method in ("auto", "fast"):
+            try:
+                rows, summary = pdf_rows.read_fast(data, password)
+                df = _frame(rows) if rows else None
+                if df is not None and (method == "fast" or _totals_agree(df, summary)):
+                    _state.method = "fast"
+                    return df, summary
+            except pdf_rows.WrongPassword:
+                raise
+            except Exception:
+                # Any problem in the fast reader (missing library, unfamiliar layout, odd text)
+                # means "use the reliable reader". Asking for "fast" explicitly shows the error.
+                if method == "fast":
+                    raise
+        rows, summary = pdf_rows.read_reliable(data, password)
+        _state.method = "reliable"
+    except pdf_rows.WrongPassword:
+        raise PDFPasswordIncorrect()
+    return _frame(rows), summary
 
 
 def _wording(details, n=3):

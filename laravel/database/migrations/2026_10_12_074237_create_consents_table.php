@@ -18,7 +18,7 @@ return new class extends Migration
     $table->string('policy_version', 20);
     $table->timestamp('granted_at');
     $table->timestamp('revoked_at')->nullable();
-    $table->boolean('is_active')->nullable()->storedAs('IF(revoked_at IS NULL, 1, NULL)');
+    $table->boolean('is_active')->nullable()->storedAs('CASE WHEN revoked_at IS NULL THEN 1 ELSE NULL END');
     $table->timestamps();
 
     $table->unique(['user_id', 'purpose', 'is_active']);

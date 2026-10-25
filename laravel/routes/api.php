@@ -7,6 +7,8 @@ use App\Http\Controllers\ConsentController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\LenderAccessController;
+use App\Http\Controllers\LenderLoanController;
+use App\Http\Controllers\LoanRequestController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PhoneVerificationController;
 use App\Http\Controllers\ProfileController;
@@ -89,6 +91,10 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::post('/access-requests/{grant}/approve', [BorrowerAccessController::class, 'approve']);
         Route::post('/access-requests/{grant}/decline', [BorrowerAccessController::class, 'decline']);
         Route::post('/access-requests/{grant}/revoke', [BorrowerAccessController::class, 'revoke']);
+        Route::get('/lenders', [LoanRequestController::class, 'lenders']);
+        Route::get('/loan-requests', [LoanRequestController::class, 'index']);
+        Route::post('/loan-requests', [LoanRequestController::class, 'store'])->middleware('throttle:10,1');
+        Route::post('/loan-requests/{loan}/withdraw', [LoanRequestController::class, 'withdraw']);
 
     });
 
@@ -101,4 +107,8 @@ Route::get('/reset-password/{token}', function (Request $request, $token) {
         Route::post('/access-requests', [LenderAccessController::class, 'store'])->middleware('throttle:10,1');
         Route::get('/access-requests', [LenderAccessController::class, 'index']);
         Route::get('/grants/{grant}/score', [LenderAccessController::class, 'show']);
+        Route::get('/loan-requests', [LenderLoanController::class, 'index']);
+        Route::get('/loan-requests/{loan}', [LenderLoanController::class, 'show']);
+        Route::post('/loan-requests/{loan}/approve', [LenderLoanController::class, 'approve']);
+        Route::post('/loan-requests/{loan}/decline', [LenderLoanController::class, 'decline']);
    });

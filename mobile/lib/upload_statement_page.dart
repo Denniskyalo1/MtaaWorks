@@ -16,60 +16,85 @@ class UploadStatementPage extends StatefulWidget {
   State<UploadStatementPage> createState() => _UploadStatementPageState();
 }
 
-class _UploadStatementPageState extends State<UploadStatementPage> {
-  final TextEditingController _passwordController = TextEditingController();
+class _StatementEntry {
+  _StatementEntry(this.file);
 
-  bool _obscure = true;
-  String? _fileName;
-  PlatformFile? _selectedFile;
+  final PlatformFile file;
+  final TextEditingController password = TextEditingController();
+  bool obscure = true;
+}
+
+class _UploadStatementPageState extends State<UploadStatementPage> {
+  static const int _maxFiles = 6;
+  static const int _maxFileBytes = 10 * 1024 * 1024;
+
+  final List<_StatementEntry> _entries = [];
   bool _scoring = false;
   int _step = 0;
 
   bool get _canSubmit =>
-      _selectedFile?.path != null &&
-          _passwordController.text.isNotEmpty &&
+      _entries.isNotEmpty &&
+          _entries.every((e) => e.password.text.isNotEmpty) &&
           !_scoring;
 
   @override
   void dispose() {
-    _passwordController.dispose();
+    for (final e in _entries) {
+      e.password.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _pickFile() async {
+  void _message(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _pickFiles() async {
     try {
       final result = await file_picker.FilePicker.platform.pickFiles(
         type: file_picker.FileType.custom,
         allowedExtensions: ['pdf'],
-        allowMultiple: false,
+        allowMultiple: true,
       );
 
       if (result == null || result.files.isEmpty) return;
 
-      final file = result.files.single;
+      var skippedLarge = 0;
+      var skippedLimit = 0;
 
-      if (file.path == null) {
-        throw Exception('Could not access the selected file.');
+      for (final file in result.files) {
+        if (file.path == null) continue;
+        if (file.size > _maxFileBytes) {
+          skippedLarge++;
+          continue;
+        }
+        if (_entries.length >= _maxFiles) {
+          skippedLimit++;
+          continue;
+        }
+        // the same file chosen twice is ignored
+        if (_entries.any((e) => e.file.name == file.name && e.file.size == file.size)) continue;
+        _entries.add(_StatementEntry(file));
       }
 
-      setState(() {
-        _selectedFile = file;
-        _fileName = file.name;
-      });
-    } catch (e) {
-      if (!mounted) return;
+      setState(() {});
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('File selection failed: $e')),
-      );
+      if (skippedLarge > 0) _message('$skippedLarge file(s) skipped: each file must be 10 MB or less.');
+      if (skippedLimit > 0) _message('Only $_maxFiles statements can be scored at once.');
+    } catch (e) {
+      _message('File selection failed: $e');
     }
   }
 
-  Future<void> _runDemoScoring() async {
-    final file = _selectedFile;
-    final password = _passwordController.text;
+  void _removeEntry(int index) {
+    setState(() {
+      _entries.removeAt(index).password.dispose();
+    });
+  }
 
-    if (file?.path == null || password.isEmpty) return;
+  Future<void> _runDemoScoring() async {
+    if (!_canSubmit) return;
 
     FocusScope.of(context).unfocus();
 
@@ -79,9 +104,9 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
     });
 
     try {
-      final response = await ApiService.scoreStatement(
-        statementPath: file!.path!,
-        password: password,
+      final response = await ApiService.scoreStatements(
+        statementPaths: _entries.map((e) => e.file.path!).toList(),
+        passwords: _entries.map((e) => e.password.text).toList(),
       );
 
       final scoreData = response['score'];
@@ -166,7 +191,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Upload your statement',
+                  'Upload your statements',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: width * 0.07,
@@ -177,7 +202,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Choose your M-PESA statement and enter \n the password Safaricom sent you.',
+                  'Choose one or more M-PESA statements (up to 6)\nand enter the password Safaricom sent for each.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: width * 0.038,
@@ -187,54 +212,26 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                 ),
                 const SizedBox(height: 28),
 
-                // File picker card
-                _fileName == null ? _buildPicker() : _buildFileRow(),
-                const SizedBox(height: 24),
-
-                // Password
-                const Text(
-                  'Statement Password',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: _obscure,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Enter The Statement Password',
-                    hintStyle:
-                    TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                    prefixIcon: Icon(Icons.lock_outline_rounded,
-                        color: Colors.grey.shade500),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        color: Colors.grey.shade500,
+                // Statement files, each with its own password
+                if (_entries.isEmpty) _buildPicker(),
+                for (var i = 0; i < _entries.length; i++) ...[
+                  _buildEntry(i),
+                  const SizedBox(height: 16),
+                ],
+                if (_entries.isNotEmpty && _entries.length < _maxFiles)
+                  OutlinedButton.icon(
+                    onPressed: _scoring ? null : _pickFiles,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Add another statement'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _purple,
+                      side: const BorderSide(color: _purple),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFFF9FAFB),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide:
-                      BorderSide(color: Colors.grey.shade300, width: 1.0),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide:
-                      const BorderSide(color: Colors.black, width: 1.0),
                     ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -243,7 +240,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Used once to open the file. We never store it.',
+                        'Each password is used once to open its file. We never store it.',
                         style: TextStyle(
                             color: Colors.grey.shade600, fontSize: 12.5),
                       ),
@@ -283,12 +280,12 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                       ),
                       _NumberedStep(
                         number: '3',
-                        text: 'The password arrives by SMS. Enter it above.',
+                        text: 'The password arrives by SMS. Enter it under the file.',
                       ),
                       _NumberedStep(
                         number: '!',
                         text:
-                        'Use a statement that covers at least 3 full months.',
+                        'Together, the statements must cover at least 3 full months with no missing months in between.',
                         last: true,
                       ),
                     ],
@@ -330,7 +327,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                 ),
               ),
               child: const Text(
-                'Score my statement',
+                'Score my statements',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -346,7 +343,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
 
   Widget _buildPicker() {
     return GestureDetector(
-      onTap: _pickFile,
+      onTap: _pickFiles,
       child: CustomPaint(
         painter: _DashedBorderPainter(color: Colors.grey.shade400),
         child: Container(
@@ -369,7 +366,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
               ),
               const SizedBox(height: 14),
               const Text(
-                'Tap to choose your statement',
+                'Tap to choose your statements',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -378,7 +375,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'PDF only · up to 10 MB',
+                'PDF only · up to 10 MB each',
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 12.5),
               ),
             ],
@@ -388,7 +385,50 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
     );
   }
 
-  Widget _buildFileRow() {
+  Widget _buildEntry(int index) {
+    final entry = _entries[index];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFileRow(entry, () => _removeEntry(index)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: entry.password,
+          obscureText: entry.obscure,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Password for this statement',
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+            prefixIcon:
+            Icon(Icons.lock_outline_rounded, color: Colors.grey.shade500),
+            suffixIcon: IconButton(
+              icon: Icon(
+                entry.obscure
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: Colors.grey.shade500,
+              ),
+              onPressed: () => setState(() => entry.obscure = !entry.obscure),
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16.0),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Colors.black, width: 1.0),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFileRow(_StatementEntry entry, VoidCallback onRemove) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -414,7 +454,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _fileName!,
+                  entry.file.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -425,7 +465,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                    '${(_selectedFile!.size / (1024 * 1024)).toStringAsFixed(2)} MB · PDF',
+                  '${(entry.file.size / (1024 * 1024)).toStringAsFixed(2)} MB · PDF',
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                 ),
               ],
@@ -433,16 +473,12 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
           ),
           IconButton(
             icon: Icon(Icons.close_rounded, color: Colors.grey.shade600),
-              onPressed: () => setState(() {
-                _fileName = null;
-                _selectedFile = null;
-              }),
+            onPressed: onRemove,
           ),
         ],
       ),
     );
   }
-
 
   Widget _buildScoring() {
     final double width = MediaQuery.of(context).size.width;

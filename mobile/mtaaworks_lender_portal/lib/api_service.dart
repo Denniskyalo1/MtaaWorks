@@ -140,4 +140,43 @@ class ApiService {
 
     return score;
   }
+
+  static Future<List<Map<String, dynamic>>> getLoanRequests() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/lender/loan-requests'), headers: _headers)
+        .timeout(const Duration(seconds: 20));
+
+    final list = _decodeResponse(response)['loan_requests'];
+
+    if (list is! List) {
+      throw Exception('The server returned an invalid loan requests response.');
+    }
+
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Opens one loan request together with the borrower's score. Counts as a view.
+  static Future<Map<String, dynamic>> getLoanRequest(int id) async {
+    final response = await http
+        .get(Uri.parse('$baseUrl/lender/loan-requests/$id'), headers: _headers)
+        .timeout(const Duration(seconds: 20));
+
+    return _decodeResponse(response);
+  }
+
+  static Future<String> decideLoanRequest({
+    required int id,
+    required bool approve,
+    String? note,
+  }) async {
+    final response = await http
+        .post(
+      Uri.parse('$baseUrl/lender/loan-requests/$id/${approve ? 'approve' : 'decline'}'),
+      headers: _headers,
+      body: jsonEncode({if (note != null && note.trim().isNotEmpty) 'note': note.trim()}),
+    )
+        .timeout(const Duration(seconds: 20));
+
+    return _decodeResponse(response)['message']?.toString() ?? 'Done.';
+  }
 }

@@ -19,7 +19,7 @@ return new class extends Migration
     $table->foreignId('credit_score_id')->nullable()->constrained()->nullOnDelete();
     $table->string('scope', 30)->default('score_tier');
     $table->string('status', 20)->default('requested')->index();
-    $table->boolean('is_open')->nullable()->storedAs("IF(status IN ('requested','approved'), 1, NULL)");
+    $table->boolean('is_open')->nullable()->storedAs("CASE WHEN status IN ('requested','approved') THEN 1 ELSE NULL END");
     $table->timestamp('requested_at');
     $table->timestamp('responded_at')->nullable();
     $table->timestamp('expires_at')->nullable();

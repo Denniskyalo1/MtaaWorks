@@ -18,19 +18,33 @@ use Illuminate\Support\Facades\Http;
 class ScoreController extends Controller
 {
     /**
-     * Score a Statement
+     * Score Statements
      *
-     * Sends an M-Pesa statement PDF to the scoring service and stores the result.
-     * Requires active consent for statement analysis. The PDF and its password are not stored.
+     * Sends one or more M-Pesa statement PDFs to the scoring service and stores one result.
+     * Send either `statement` and `password` (one file), or `statements[]` and `passwords[]`
+     * (up to 6 files, one password for each, in the same order). Several statements must cover a
+     * continuous period together. Requires active consent for statement analysis. The PDFs and
+     * their passwords are not stored.
      */
     public function store(Request $request): JsonResponse
     {
         set_time_limit(150);
 
         $request->validate([
-            'statement' => ['required', 'file', 'mimes:pdf', 'max:10240'],
-            'password'  => ['required', 'string', 'max:100'],
+            'statement'    => ['required_without:statements', 'file', 'mimes:pdf', 'max:10240'],
+            'password'     => ['required_with:statement', 'string', 'max:100'],
+            'statements'   => ['required_without:statement', 'array', 'min:1', 'max:6'],
+            'statements.*' => ['file', 'mimes:pdf', 'max:10240'],
+            'passwords'    => ['required_with:statements', 'array'],
+            'passwords.*'  => ['required', 'string', 'max:100'],
         ]);
+
+        $files = $request->hasFile('statements') ? $request->file('statements') : [$request->file('statement')];
+        $passwords = $request->hasFile('statements') ? array_values($request->input('passwords', [])) : [$request->input('password')];
+
+        if (count($files) !== count($passwords)) {
+            return response()->json(['message' => 'Supply one password for each statement.'], 422);
+        }
 
         $user = $request->user();
 
@@ -39,12 +53,19 @@ class ScoreController extends Controller
         }
 
         try {
-            $response = Http::timeout(120)
-                ->withHeaders(['X-Service-Key' => config('services.scoring.key')])
-                ->attach('file', file_get_contents($request->file('statement')->getRealPath()), 'statement.pdf')
-                ->post(config('services.scoring.url') . '/score-statement', [
-                    'password' => $request->input('password'),
-                ]);
+            $client = Http::timeout(120)->withHeaders(['X-Service-Key' => config('services.scoring.key')]);
+
+            if (count($files) === 1 && ! $request->hasFile('statements')) {
+                $response = $client
+                    ->attach('file', file_get_contents($files[0]->getRealPath()), 'statement.pdf')
+                    ->post(config('services.scoring.url') . '/score-statement', ['password' => $passwords[0]]);
+            } else {
+                foreach ($files as $i => $file) {
+                    $client = $client->attach('files', file_get_contents($file->getRealPath()), 'statement-' . ($i + 1) . '.pdf');
+                }
+                $response = $client->post(config('services.scoring.url') . '/score-statements',
+                    ['passwords' => json_encode(array_values($passwords))]);
+            }
         } catch (ConnectionException) {
             return response()->json(['message' => 'The scoring service is unavailable. Try again later.'], 503);
         }
