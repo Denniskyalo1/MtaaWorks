@@ -219,10 +219,8 @@ Do not commit `.env` files. Only the `.env.example` files are stored in the repo
 | The borrower app shows "route could not be found" | `baseUrl` in `lib/services/api_service.dart` is missing `/api` at the end |
 | The borrower app cannot reach the backend on a phone | `10.0.2.2` only works in the emulator. Use the computer's LAN address. |
 | A lender's set-password link does not open | The portal must be running on port 5000 (or `PORTAL_URL` changed to match) |
-| `pip install` fails on `winrt-*` packages | You used the root `requirements.txt`, which is an old full environment export. Use `ml-service/requirements.txt`. |
 
 ## Repository notes
 
-- The root `requirements.txt` is an old export of the whole development environment, including Windows-only packages. The scoring service needs only `ml-service/requirements.txt`.
 - Commit `7738aa0` removed many files by mistake and the next commit restored them, so the history shows both.
 - `ml-service/models` holds the trained models used in the report (`model_meta.json` records the model version and metrics). `ml-service/data` is empty until you generate data.
