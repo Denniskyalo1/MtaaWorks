@@ -18,9 +18,14 @@ laravel/database/*.sqlite
 mobile/build/
 mobile/.dart_tool/
 mobile/.flutter-plugin-dependencies
+mobile/.env
 
 # OS/editor clutter
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+*.bak
+apply_batch*.py
+laravel/mtaaworks_test

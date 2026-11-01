@@ -32,11 +32,30 @@ return [
        'client_id' => env('GOOGLE_CLIENT_ID'),
    ],
 
+   'africastalking' => [
+    'username'  => env('AT_USERNAME'),
+    'api_key'   => env('AT_API_KEY'),
+    'sandbox'   => env('AT_SANDBOX', true),
+    'sender_id' => env('AT_SENDER_ID'),
+   ],
+
+  
+   'scoring' => [
+    'url' => env('SCORING_SERVICE_URL'),
+    'key' => env('SCORING_SERVICE_KEY'),
+  ],
+
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+
+    'portal' => [
+        'url' => env('PORTAL_URL', 'http://localhost:5000'),
     ],
 
 ];
