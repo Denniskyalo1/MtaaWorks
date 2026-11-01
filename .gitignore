@@ -18,7 +18,6 @@ laravel/database/*.sqlite
 mobile/build/
 mobile/.dart_tool/
 mobile/.flutter-plugin-dependencies
-mobile/.env
 
 # OS/editor clutter
 .DS_Store

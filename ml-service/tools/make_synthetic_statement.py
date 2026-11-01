@@ -38,7 +38,7 @@ def make_rows(start, months, per_day=9, seed=1):
     return tx
 
 
-def render(path, password, tx, wrap=False, valign="TOP", rules=True):
+def render(path, password, tx, wrap=False, valign="TOP", rules=True, customer=None, mobile=None, layout="inline"):
     rnd = random.Random(0)
     tin = sum(float(r[4].replace(",", "")) for r in tx); tout = sum(abs(float(r[5].replace(",", ""))) for r in tx)
     ss = getSampleStyleSheet()
@@ -57,15 +57,25 @@ def render(path, password, tx, wrap=False, valign="TOP", rules=True):
     style = [("FONTSIZE", (0,0), (-1,-1), 6.5), ("VALIGN", (0,0), (-1,-1), valign)]
     style += [("GRID", (0,0), (-1,-1), .4, colors.black)] if rules else [("BOX", (0,0), (-1,-1), .4, colors.black), ("LINEAFTER", (0,0), (-2,-1), .4, colors.black)]
     big.setStyle(TableStyle(style))
-    doc.build([Paragraph("MPESA FULL STATEMENT (synthetic)", ss["Title"]), Paragraph("All amounts are in KES. TOTAL (KES) figures are summarised below.", ss["Normal"]), summ, Spacer(1, 6*mm), big])
+    header = []
+    if customer or mobile:   # the customer block at the top of a real statement, in three different layouts
+        pairs = [("Customer Name", customer), ("Mobile Number", mobile), ("Date of Statement", "01 Nov 2026")]
+        pairs = [(k, v) for k, v in pairs if v]
+        if layout == "inline":
+            header = [Paragraph("%s: %s" % (k, v), ss["Normal"]) for k, v in pairs]
+        elif layout == "stacked":
+            header = [Paragraph(x, ss["Normal"]) for k, v in pairs for x in ("%s:" % k, v)]
+        else:   # "block": all the labels first, then all the values
+            header = [Paragraph("%s:" % k, ss["Normal"]) for k, v in pairs] + [Paragraph(v, ss["Normal"]) for k, v in pairs]
+    doc.build([Paragraph("MPESA FULL STATEMENT (synthetic)", ss["Title"])] + header + [Paragraph("All amounts are in KES. TOTAL (KES) figures are summarised below.", ss["Normal"]), summ, Spacer(1, 6*mm), big])
     return len(tx)
 
 
-def build(path, password, start, months, per_day=9, seed=1, wrap=False, valign="TOP", rules=True):
-    return render(path, password, make_rows(start, months, per_day, seed), wrap, valign, rules)
+def build(path, password, start, months, per_day=9, seed=1, wrap=False, valign="TOP", rules=True, customer=None, mobile=None, layout="inline"):
+    return render(path, password, make_rows(start, months, per_day, seed), wrap, valign, rules, customer, mobile, layout)
 
 
-def build_pair(path_a, pw_a, path_b, pw_b, start, months, overlap_days=14, per_day=6, seed=1):
+def build_pair(path_a, pw_a, path_b, pw_b, start, months, overlap_days=14, per_day=6, seed=1, customer=None, mobile=None, layout="inline"):
     """Two statements of the SAME account: A is the earlier period, B the later, overlapping by overlap_days."""
     tx = make_rows(start, months, per_day, seed)
     when = [datetime.strptime(r[1], "%Y-%m-%d %H:%M:%S") for r in tx]
@@ -73,8 +83,8 @@ def build_pair(path_a, pw_a, path_b, pw_b, start, months, overlap_days=14, per_d
     half = timedelta(days=overlap_days / 2)
     a = [r for r, w in zip(tx, when) if w < mid + half]
     b = [r for r, w in zip(tx, when) if w >= mid - half]
-    render(path_a, pw_a, a)
-    render(path_b, pw_b, b)
+    render(path_a, pw_a, a, customer=customer, mobile=mobile, layout=layout)
+    render(path_b, pw_b, b, customer=customer, mobile=mobile, layout=layout)
     return len(a), len(b)
 
 if __name__ == "__main__":

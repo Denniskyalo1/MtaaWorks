@@ -187,3 +187,30 @@ def read_reliable(data, password, workers=None):
             rows += r
             summary = summary or s
     return rows, summary
+
+
+# ---------------------------------------------------------------- customer name and number (first page)
+
+def read_identity(data, password):
+    """The customer name and mobile number printed on the first page, as {"name": ..., "phone": ...}."""
+    from src.identity import parse_identity
+    text = ""
+    try:
+        import pymupdf
+        doc = pymupdf.open(stream=data, filetype="pdf")
+        if doc.needs_pass and not doc.authenticate(password):
+            raise WrongPassword()
+        text = doc[0].get_text() if len(doc) else ""
+    except ImportError:
+        import io
+        import pdfplumber
+        from pdfminer.pdfdocument import PDFPasswordIncorrect
+        try:
+            with pdfplumber.open(io.BytesIO(data), password=password) as pdf:
+                text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        except Exception as exc:
+            if isinstance(exc, PDFPasswordIncorrect) or any(isinstance(a, PDFPasswordIncorrect) for a in exc.args):
+                raise WrongPassword() from exc
+            raise
+    return parse_identity(text)
+

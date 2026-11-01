@@ -18,6 +18,7 @@ import json
 import os
 import hmac
 import time
+from typing import Optional
 from pathlib import Path
 import joblib
 import pandas as pd
@@ -25,6 +26,8 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadF
 from pdfminer.pdfdocument import PDFPasswordIncorrect
 from pydantic import BaseModel, Field
 from scalar_fastapi import add_scalar_reference
+from src.identity import check_identity, identities_agree, identity_check_enabled
+from src.pdf_rows import read_identity
 from src.statement_parser import (read_statement, validate, compute_features, features_for_scoring,
                                   last_read_method)
 
@@ -98,6 +101,9 @@ class StatementValidation(BaseModel):
     duplicate_rows_removed: int = 0
     parser: str = "unknown"
     parse_seconds: float = 0.0
+    identity_checked: bool = False
+    name_matched: Optional[bool] = None
+    phone_matched: Optional[bool] = None
 
 
 class StatementScoreResponse(BaseModel):
@@ -170,7 +176,7 @@ def score(features: BorrowerFeatures):
     return score_values(features.model_dump())
 
 
-def _read_one(data: bytes, password: str, label: str):
+def _read_one(data: bytes, password: str, label: str, expected_name: str = "", expected_phone: str = "", need_identity: bool = False):
     """Read one statement PDF. Errors name the statement when several were uploaded."""
     prefix = f"{label}: " if label else ""
     started = time.perf_counter()
@@ -188,10 +194,26 @@ def _read_one(data: bytes, password: str, label: str):
     if v.totals_checked and not (v.paid_in_matches and v.paid_out_matches):
         raise HTTPException(status_code=422, detail=f"{prefix}The transactions read do not match the statement's own "
                                                     "totals, so the statement was not scored.")
-    return df, v, seconds, last_read_method() or "unknown"
+    method = last_read_method() or "unknown"
+
+    # Who is the statement for? The name and number printed on it are compared with the account, and are not kept.
+    found, identity = {}, {"checked": False, "name_matched": None, "phone_matched": None}
+    if identity_check_enabled() and (expected_name or expected_phone or need_identity):
+        try:
+            found = read_identity(data, password)
+        except Exception:
+            found = {}
+        identity = check_identity(found, expected_name, expected_phone)
+        if identity["mismatch"]:
+            if identity["name_matched"] is False:
+                raise HTTPException(status_code=422, detail=f"{prefix}The customer name on the statement does not match the name on your "
+                                    "MtaaWorks account. Update your name in your profile if it is spelt differently, or upload your own statement.")
+            raise HTTPException(status_code=422, detail=f"{prefix}The mobile number on the statement does not match the verified phone "
+                                "number on your MtaaWorks account.")
+    return df, v, seconds, method, found, identity
 
 
-def _score_frame(df, v, files_read, duplicates, seconds, parser_name):
+def _score_frame(df, v, files_read, duplicates, seconds, parser_name, identity=None):
     features, info = compute_features(df)
     if info["months_used"] < MIN_FULL_MONTHS:
         raise HTTPException(status_code=422, detail=f"At least {MIN_FULL_MONTHS} full calendar months of "
@@ -208,23 +230,26 @@ def _score_frame(df, v, files_read, duplicates, seconds, parser_name):
             totals_checked=v.totals_checked, totals_match=bool(v.paid_in_matches and v.paid_out_matches),
             balance_breaks_by_completion_time=v.group_breaks,
             files_read=files_read, duplicate_rows_removed=duplicates,
-            parser=parser_name, parse_seconds=round(seconds, 2)),
+            parser=parser_name, parse_seconds=round(seconds, 2),
+            identity_checked=bool((identity or {}).get("checked")),
+            name_matched=(identity or {}).get("name_matched"),
+            phone_matched=(identity or {}).get("phone_matched")),
     )
 
 
 # These are plain functions (not async) so FastAPI runs them in its thread pool; reading a PDF is
 # CPU work and would otherwise block every other request, including /health, while it ran.
 @app.post("/score-statement", response_model=StatementScoreResponse, dependencies=[Depends(require_service_key)])
-def score_statement(file: UploadFile = File(...), password: str = Form(...)):
+def score_statement(file: UploadFile = File(...), password: str = Form(...), expected_name: str = Form(""), expected_phone: str = Form("")):
     data = file.file.read()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="The file is too large.")
-    df, v, seconds, parser_name = _read_one(data, password, "")
-    return _score_frame(df, v, 1, 0, seconds, parser_name)
+    df, v, seconds, parser_name, _, identity = _read_one(data, password, "", expected_name, expected_phone)
+    return _score_frame(df, v, 1, 0, seconds, parser_name, identity)
 
 
 @app.post("/score-statements", response_model=StatementScoreResponse, dependencies=[Depends(require_service_key)])
-def score_statements(files: list[UploadFile] = File(...), passwords: str = Form(...)):
+def score_statements(files: list[UploadFile] = File(...), passwords: str = Form(...), expected_name: str = Form(""), expected_phone: str = Form("")):
     """Score several statements of one borrower together (for example two 3-month statements).
     `passwords` is a JSON list with one password per file, in the same order as the files."""
     if not 1 <= len(files) <= MAX_FILES:
@@ -243,9 +268,20 @@ def score_statements(files: list[UploadFile] = File(...), passwords: str = Form(
 
     frames, seconds_total, methods, seen, duplicates = [], 0.0, [], set(), 0
     totals_ok, breaks_each = True, 0
+    first_found, identity_result = None, {"checked": False, "name_matched": None, "phone_matched": None}
     for n, (data, password) in enumerate(zip(blobs, password_list), start=1):
         label = f"Statement {n}" if len(blobs) > 1 else ""
-        df, v, seconds, parser_name = _read_one(data, password, label)
+        df, v, seconds, parser_name, found, identity = _read_one(data, password, label, expected_name, expected_phone, need_identity=len(blobs) > 1)
+        identity_result = {
+            "checked": identity["checked"] or identity_result["checked"],
+            "name_matched": identity["name_matched"] if identity["name_matched"] is not None else identity_result["name_matched"],
+            "phone_matched": identity["phone_matched"] if identity["phone_matched"] is not None else identity_result["phone_matched"],
+        }
+        if first_found is None:
+            first_found = found
+        elif identity_check_enabled() and identities_agree(first_found, found) is False:
+            raise HTTPException(status_code=422, detail="These statements show different customer names or mobile numbers, so they do not "
+                                "appear to belong to the same M-Pesa account. Upload statements from one account only.")
         seconds_total += seconds
         methods.append(parser_name)
         totals_ok = totals_ok and v.totals_checked
@@ -275,4 +311,7 @@ def score_statements(files: list[UploadFile] = File(...), passwords: str = Form(
     v.totals_checked = totals_ok                      # each statement was checked against its own TOTAL row
     v.paid_in_matches = v.paid_out_matches = totals_ok
     parser_name = methods[0] if len(set(methods)) == 1 else "mixed"
-    return _score_frame(merged, v, len(frames), duplicates, seconds_total, parser_name)
+    return _score_frame(merged, v, len(frames), duplicates, seconds_total, parser_name, identity_result)
+
+from src.report_api import make_router  # noqa: E402
+app.include_router(make_router(require_service_key))

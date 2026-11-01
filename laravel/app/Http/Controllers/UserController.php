@@ -33,7 +33,7 @@ class UserController extends Controller
        ]);
        
       $normalizedNationalId = trim($validated['national_id']);
-      $nationalIdHash = hash_hmac('sha256', $normalizedNationalId, config('app.key'));
+      $nationalIdHash = hash('sha256', $normalizedNationalId);
 
       if (User::where('national_id_hash', $nationalIdHash)->exists()) {
             return response()->json([
@@ -46,19 +46,18 @@ class UserController extends Controller
             ], 422);
         }
 
-       $user = new User([
+       $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'phone_number' => $validated['phone_number'] ?? null,
+            'national_id' => $normalizedNationalId,
+            'password' => $validated['password'],
         ]);
-        $user->national_id = $normalizedNationalId;
-        $user->password =$validated['password'];
-        $user->save();
 
         $user->sendEmailVerificationNotification();
 
           return response()->json([
-            'message' => 'Registration successful. A verification email has been sent to your email address.',
+            'message' => 'Registration successful.',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -84,13 +83,6 @@ class UserController extends Controller
         ]);
 
         $user = User::where('email', $validated['email'])->first();
-
-        if ($user && is_null($user->password)) {
-           return response()->json([
-                 'message' => 'This account uses Google sign-in. Use "Sign in with Google", or reset your password to add one.',
-                 'code' => 'google_only',
-        ] , 401);
-}
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return response()->json([
