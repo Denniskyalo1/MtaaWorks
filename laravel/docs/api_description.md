@@ -2,7 +2,7 @@
 
 MtaaWorks turns a borrower's consented M-Pesa statement into a credit risk score, a risk tier and a short explanation. This API serves the MtaaWorks mobile app.
 
-> **Status: version 0.1, borrower features only.** Lender access is planned for a later version (see the end of this page). Edit this text whenever the behaviour changes.
+> **Status: prototype.** The borrower routes, the lender routes (access requests, loan requests, portfolio summary), the admin route that creates lenders and the credit report routes are all listed below. Edit this text whenever the behaviour changes.
 
 ## How it works
 
@@ -66,4 +66,4 @@ Validation errors list each failing field.
 
 ## Not yet available
 
-Lender accounts, access requests and portfolio analytics are planned for a later version.
+Automatic retrieval of statements through the Daraja API is not available; a borrower uploads the statement PDF.
