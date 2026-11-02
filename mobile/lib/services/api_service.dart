@@ -157,6 +157,20 @@ class ApiService {
     }
 
     await clearToken();
+    // The next person to sign in on this phone starts with no notifications seen.
+    await _storage.delete(key: _notificationsSeenKey);
+  }
+
+  static const String _notificationsSeenKey = 'notifications_seen_at';
+
+  /// When the borrower last opened Notifications on this phone (null if never).
+  static Future<DateTime?> getNotificationsSeenAt() async {
+    final value = await _storage.read(key: _notificationsSeenKey);
+    return value == null ? null : DateTime.tryParse(value);
+  }
+
+  static Future<void> setNotificationsSeenAt(DateTime when) {
+    return _storage.write(key: _notificationsSeenKey, value: when.toIso8601String());
   }
 
   static Future<Map<String, dynamic>> getProfile() async {

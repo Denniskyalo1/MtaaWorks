@@ -8,6 +8,7 @@ import 'edit_profile_page.dart';
 import 'change_password_page.dart';
 import 'set_password_page.dart';
 import 'verify_phone_page.dart';
+import 'lender_requests_page.dart';
 
 const Color _purple = Color(0xFF7C3AED);
 const Color _purpleSoft = Color(0xFFF3EEFF);
@@ -601,16 +602,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 _SettingsRow(
                   icon: Icons.business_outlined,
                   title: 'Lender access',
-                  subtitle: '$_pendingRequests pending requests',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'The lender access management screen has not '
-                              'been connected to this row yet.',
-                        ),
+                  subtitle: _pendingRequests == 1
+                      ? '1 pending request · manage approved lenders'
+                      : '$_pendingRequests pending requests · manage approved lenders',
+                  onTap: () async {
+                    // Same screen as the Requests tab: pending requests to answer
+                    // and approved lenders that can be revoked.
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LenderRequestsPage(),
                       ),
                     );
+                    if (mounted) await _loadProfile();
                   },
                   last: true,
                 ),

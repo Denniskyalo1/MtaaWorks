@@ -7,9 +7,9 @@ import 'loan_pages.dart';
 import 'report_page.dart';
 import 'score_history_page.dart';
 import 'access_history_page.dart';
+import 'activity_feed.dart';
+import 'notifications_page.dart';
 import 'services/api_service.dart';
-
-const int _pendingRequests = 2;
 
 const Color _purple = Color(0xFF7C3AED);
 const Color _purpleSoft = Color(0xFFF3EEFF);
@@ -35,11 +35,70 @@ class _HomePageState extends State<HomePage> {
   bool _isLoadingScore = true;
   String? _scoreError;
 
+  ActivitySnapshot? _activity;
+  bool _isLoadingActivity = true;
+  DateTime? _notificationsSeenAt;
+
   @override
   void initState() {
     super.initState();
     _loadProfile();
     _loadLatestScore();
+    _loadActivity();
+  }
+
+  /// Consent status, pending requests, recent activity and the unread count.
+  Future<void> _loadActivity() async {
+    final snapshot = await ActivityFeed.load();
+    final seenAt = await ApiService.getNotificationsSeenAt();
+
+    if (!mounted) return;
+
+    setState(() {
+      _activity = snapshot;
+      _notificationsSeenAt = seenAt;
+      _isLoadingActivity = false;
+    });
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([_loadProfile(), _loadLatestScore(), _loadActivity()]);
+  }
+
+  /// Requests and consent live in Home's own tabs; the rest are separate pages.
+  Future<void> _openTarget(ActivityTarget? target) async {
+    switch (target) {
+      case ActivityTarget.requests:
+        setState(() => _tab = 1);
+        return;
+      case ActivityTarget.profile:
+        setState(() => _tab = 2);
+        return;
+      case ActivityTarget.loans:
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => const LoanRequestsPage()));
+        break;
+      case ActivityTarget.views:
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AccessHistoryPage()));
+        break;
+      case ActivityTarget.scoreHistory:
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScoreHistoryPage()));
+        break;
+      case null:
+        break;
+    }
+    if (mounted) await _loadActivity();
+  }
+
+  Future<void> _openNotifications() async {
+    final target = await Navigator.push<ActivityTarget>(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsPage()),
+    );
+
+    if (!mounted) return;
+
+    await _loadActivity();
+    if (target != null) await _openTarget(target);
   }
 
   Future<void> _loadProfile() async {
@@ -154,6 +213,14 @@ class _HomePageState extends State<HomePage> {
           isLoadingScore: _isLoadingScore,
           scoreError: _scoreError,
           onRetryScore: _loadLatestScore,
+          consentActive: _activity?.consentActive,
+          pendingRequests: _activity?.pendingRequests,
+          activity: _activity?.items ?? const [],
+          isLoadingActivity: _isLoadingActivity,
+          unreadCount: _activity?.unreadSince(_notificationsSeenAt) ?? 0,
+          onRefresh: _refreshAll,
+          onOpenNotifications: _openNotifications,
+          onOpenTarget: _openTarget,
         )
             : _tab == 1
             ? const LenderRequestsPage()
@@ -163,7 +230,11 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.white,
         indicatorColor: _purpleSoft,
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        onDestinationSelected: (i) {
+          setState(() => _tab = i);
+          // Coming back to Home after answering a request or changing consent.
+          if (i == 0) _loadActivity();
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -198,6 +269,14 @@ class _HomeBody extends StatelessWidget {
     required this.isLoadingScore,
     required this.scoreError,
     required this.onRetryScore,
+    required this.consentActive,
+    required this.pendingRequests,
+    required this.activity,
+    required this.isLoadingActivity,
+    required this.unreadCount,
+    required this.onRefresh,
+    required this.onOpenNotifications,
+    required this.onOpenTarget,
   });
 
   final String userName;
@@ -212,6 +291,21 @@ class _HomeBody extends StatelessWidget {
   final String? scoreError;
   final Future<void> Function() onRetryScore;
 
+  final bool? consentActive;
+  final int? pendingRequests;
+  final List<ActivityItem> activity;
+  final bool isLoadingActivity;
+  final int unreadCount;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function() onOpenNotifications;
+  final Future<void> Function(ActivityTarget?) onOpenTarget;
+
+  /// Opens a page, then refreshes Home when the borrower comes back.
+  Future<void> _push(BuildContext context, Widget page) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    await onRefresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
@@ -222,7 +316,11 @@ class _HomeBody extends StatelessWidget {
     final double progress =
     score == null ? 0 : (score! / 100).clamp(0.0, 1.0);
 
-    return SingleChildScrollView(
+    return RefreshIndicator(
+      color: _purple,
+      onRefresh: onRefresh,
+      child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(
         horizontal: 24,
         vertical: 16,
@@ -272,38 +370,57 @@ class _HomeBody extends StatelessWidget {
                   ],
                 ),
               ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: const Icon(
-                      Icons.notifications_none_rounded,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Positioned(
-                    right: 2,
-                    top: 2,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _purple,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
+              Tooltip(
+                message: unreadCount > 0
+                    ? '$unreadCount new notification${unreadCount == 1 ? '' : 's'}'
+                    : 'Notifications',
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => onOpenNotifications(),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Icon(
+                          unreadCount > 0
+                              ? Icons.notifications_active_outlined
+                              : Icons.notifications_none_rounded,
+                          color: Colors.black87,
                         ),
                       ),
-                    ),
+                      if (unreadCount > 0)
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            constraints: const BoxConstraints(minWidth: 18),
+                            height: 18,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: _purple,
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -450,14 +567,7 @@ class _HomeBody extends StatelessWidget {
               ),
             ),
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ConsentPage(),
-                  ),
-                );
-              },
+              onPressed: () => _push(context, const ConsentPage()),
               icon: const Icon(
                 Icons.upload_file_rounded,
                 color: Colors.black,
@@ -485,12 +595,7 @@ class _HomeBody extends StatelessWidget {
           SizedBox(
             height: 54,
             child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoanRequestsPage()),
-                );
-              },
+              onPressed: () => _push(context, const LoanRequestsPage()),
               icon: const Icon(Icons.request_quote_outlined, color: _purple),
               label: const Text(
                 'Loan requests',
@@ -515,10 +620,7 @@ class _HomeBody extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ScoreHistoryPage()),
-                  ),
+                  onPressed: () => _push(context, const ScoreHistoryPage()),
                   icon: const Icon(Icons.show_chart_rounded, color: _purple),
                   label: const Text('Score history', style: TextStyle(color: _purple)),
                   style: OutlinedButton.styleFrom(
@@ -531,10 +633,7 @@ class _HomeBody extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AccessHistoryPage()),
-                  ),
+                  onPressed: () => _push(context, const AccessHistoryPage()),
                   icon: const Icon(Icons.visibility_outlined, color: _purple),
                   label: const Text('Who viewed', style: TextStyle(color: _purple)),
                   style: OutlinedButton.styleFrom(
@@ -552,10 +651,7 @@ class _HomeBody extends StatelessWidget {
           SizedBox(
             height: 54,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReportPage()),
-              ),
+              onPressed: () => _push(context, const ReportPage()),
               icon: const Icon(Icons.picture_as_pdf_rounded, color: _purple),
               label: const Text(
                 'Credit report (PDF)',
@@ -571,24 +667,41 @@ class _HomeBody extends StatelessWidget {
           const SizedBox(height: 24),
 
           Row(
-            children: const [
+            children: [
               Expanded(
                 child: _StatusCard(
                   icon: Icons.verified_user_outlined,
                   title: 'Consent',
-                  chipText: 'Active',
-                  chipColor: Color(0xFFE7F6EC),
-                  chipTextColor: Color(0xFF1E8E4E),
+                  chipText: isLoadingActivity
+                      ? 'Loading'
+                      : consentActive == null
+                          ? 'Unavailable'
+                          : consentActive!
+                              ? 'Active'
+                              : 'Not given',
+                  chipColor: consentActive == true
+                      ? const Color(0xFFE7F6EC)
+                      : const Color(0xFFFFF8E8),
+                  chipTextColor: consentActive == true
+                      ? const Color(0xFF1E8E4E)
+                      : const Color(0xFFB7791F),
+                  // Consent is managed on the profile screen.
+                  onTap: () => onOpenTarget(ActivityTarget.profile),
                 ),
               ),
-              SizedBox(width: 14),
+              const SizedBox(width: 14),
               Expanded(
                 child: _StatusCard(
                   icon: Icons.business_outlined,
                   title: 'Lender requests',
-                  chipText: '$_pendingRequests pending',
+                  chipText: isLoadingActivity
+                      ? 'Loading'
+                      : pendingRequests == null
+                          ? 'Unavailable'
+                          : '$pendingRequests pending',
                   chipColor: _purpleSoft,
                   chipTextColor: _purple,
+                  onTap: () => onOpenTarget(ActivityTarget.requests),
                 ),
               ),
             ],
@@ -596,36 +709,67 @@ class _HomeBody extends StatelessWidget {
 
           const SizedBox(height: 28),
 
-          const Text(
-            'Recent activity',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Recent activity',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              if (activity.length > 5)
+                TextButton(
+                  onPressed: () => onOpenNotifications(),
+                  child: const Text(
+                    'See all',
+                    style: TextStyle(color: _purple, fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
 
-          const _ActivityTile(
-            icon: Icons.insights_rounded,
-            title: 'Statement scored',
-            subtitle: 'Latest scoring activity',
-            time: 'Recent',
-          ),
-          const _ActivityTile(
-            icon: Icons.business_outlined,
-            title: 'Lender access',
-            subtitle: 'Lender request activity',
-            time: 'Recent',
-          ),
-          const _ActivityTile(
-            icon: Icons.verified_user_outlined,
-            title: 'Consent',
-            subtitle: 'Statement analysis consent',
-            time: 'Recent',
-          ),
+          if (isLoadingActivity)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _purple),
+                ),
+              ),
+            )
+          else if (activity.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _cardFill,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Text(
+                'No activity yet. Give consent and score a statement to get started.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            )
+          else
+            for (final item in activity.take(5))
+              _ActivityTile(
+                icon: item.icon,
+                title: item.title,
+                subtitle: item.subtitle,
+                time: timeAgo(item.when),
+                onTap: () => onOpenTarget(item.target),
+              ),
           const SizedBox(height: 8),
         ],
+      ),
       ),
     );
   }
@@ -678,6 +822,7 @@ class _StatusCard extends StatelessWidget {
     required this.chipText,
     required this.chipColor,
     required this.chipTextColor,
+    this.onTap,
   });
 
   final IconData icon;
@@ -685,10 +830,14 @@ class _StatusCard extends StatelessWidget {
   final String chipText;
   final Color chipColor;
   final Color chipTextColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _cardFill,
@@ -729,6 +878,7 @@ class _StatusCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
   }
 }
@@ -739,17 +889,23 @@ class _ActivityTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.time,
+    this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String time;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _cardFill,
@@ -799,6 +955,8 @@ class _ActivityTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+      ),
       ),
     );
   }
