@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Users
- * 
- * 
+ *
+ *
  * Controller for handling user-related actions, such as registration.
  */
 
@@ -19,7 +19,7 @@ class UserController extends Controller
 {
 /**
  * Register
- * 
+ *
  *
  * Allows users to register.
  */
@@ -31,7 +31,7 @@ class UserController extends Controller
         'national_id' => 'required|string|max:255|unique:users',
         'password' => 'required|string|min:8|confirmed',
        ]);
-       
+
       $normalizedNationalId = trim($validated['national_id']);
       $nationalIdHash = hash_hmac('sha256', $normalizedNationalId, config('app.key'));
 
@@ -72,7 +72,7 @@ class UserController extends Controller
 
     /**
  * Login
- * 
+ *
  *
  * Allows users to login.
  */
@@ -98,6 +98,14 @@ class UserController extends Controller
             ], 401);
         }
 
+        // Checked after the password, so this never reveals whether an email exists.
+        if ($user->role === User::ROLE_LENDER && !$user->lender?->isActive()) {
+            return response()->json([
+                'message' => 'This lender account is suspended. Contact MtaaWorks support.',
+                'code' => 'lender_suspended',
+            ], 403);
+        }
+
         // Generate a token for the user
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -105,11 +113,19 @@ class UserController extends Controller
             'message' => 'Login successful.',
             'access_token' => $token,
             'token_type' => 'Bearer',
+            // Lets the web portal route admins and lender staff to the right pages.
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'lender' => $user->lender?->only(['id', 'name']),
+            ],
         ]);
     }
    /**
  * Logout
- * 
+ *
  *
  * Allows users to logout.
  */

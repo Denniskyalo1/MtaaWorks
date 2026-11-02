@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 
+import 'admin/admin_shell_page.dart';
 import 'api_service.dart';
 import 'dashboard_page.dart';
 
@@ -48,9 +49,12 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
+      // Admins get the admin workspace; lender staff get the lender dashboard.
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => const DashboardPage(),
+          builder: (_) => ApiService.isAdmin
+              ? const AdminShellPage()
+              : const DashboardPage(),
         ),
       );
     } catch (e) {
@@ -354,7 +358,7 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 22),
             const Center(
               child: Text(
-                'Access is available to authorised lender accounts.',
+                'Access is available to authorised lender and admin accounts.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black45,

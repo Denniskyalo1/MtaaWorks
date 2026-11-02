@@ -12,6 +12,9 @@ class Lender extends Model
         'digital_lender'
     ];
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_SUSPENDED = 'suspended';
+
     protected $fillable = [
         'name',
         'type',
@@ -19,8 +22,13 @@ class Lender extends Model
         'status',
         'created_by'
     ];
-    
+
     public function staff() {
          return $this->hasMany(User::class);
      }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
 }
