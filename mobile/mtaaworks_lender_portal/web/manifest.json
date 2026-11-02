@@ -1,6 +1,6 @@
 {
-    "name": "mtaaworks_lender_portal",
-    "short_name": "mtaaworks_lender_portal",
+    "name": "MtaaWorks Portal",
+    "short_name": "MtaaWorks Portal",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

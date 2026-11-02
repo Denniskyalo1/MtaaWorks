@@ -6,7 +6,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8001/api';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8001/api',
+  );
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   static bool _googleInitialized = false;
