@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
+import 'package:mtaaworks/login_page.dart';
+
 import 'home_page.dart';
+import 'verify_phone_page.dart';
 
 const Color _purple = Color(0xFF7C3AED);
 const Color _purpleSoft = Color(0xFFF3EEFF);
@@ -27,14 +30,25 @@ class CompleteProfilePage extends StatefulWidget {
 class _CompleteProfilePageState extends State<CompleteProfilePage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmController = TextEditingController();
 
   bool _confirmed = false;
   bool _isSubmitting = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  // Track what the backend has already saved, so a retry after a
+  // partial failure does not resend the profile (which would return 409).
+  bool _profileSaved = false;
+  bool _passwordSaved = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
     _idController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -54,8 +68,24 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
         .hasMatch(_cleanPhone);
   }
 
+  // Password is optional: valid when both fields are empty,
+  // or when it has 8+ characters and both fields match.
+  bool get _passwordProvided =>
+      _passwordController.text.isNotEmpty ||
+          _confirmController.text.isNotEmpty;
+
+  bool get _passwordValid {
+    if (!_passwordProvided) return true;
+    return _passwordController.text.length >= 8 &&
+        _passwordController.text == _confirmController.text;
+  }
+
   bool get _canSubmit =>
-      _idValid && _confirmed && _phoneValid && !_isSubmitting;
+      _idValid &&
+          _confirmed &&
+          _phoneValid &&
+          _passwordValid &&
+          !_isSubmitting;
 
   String? get _idError {
     if (_idController.text.isEmpty || _idValid) return null;
@@ -67,10 +97,23 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
     return 'Use a Kenyan number, e.g. 0712 345 678';
   }
 
+  String? get _passwordError {
+    final value = _passwordController.text;
+    if (value.isEmpty || value.length >= 8) return null;
+    return 'Use at least 8 characters';
+  }
+
+  String? get _confirmError {
+    final value = _confirmController.text;
+    if (value.isEmpty || value == _passwordController.text) return null;
+    return 'Passwords do not match';
+  }
+
   InputDecoration _decoration({
     required String hint,
     required IconData icon,
     String? errorText,
+    Widget? suffixIcon,
   }) {
     OutlineInputBorder border(Color color, [double width = 1.0]) {
       return OutlineInputBorder(
@@ -86,6 +129,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
         fontSize: 14,
       ),
       prefixIcon: Icon(icon, color: Colors.grey.shade500),
+      suffixIcon: suffixIcon,
       errorText: errorText,
       filled: true,
       fillColor: _cardFill,
@@ -107,6 +151,44 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
           fontWeight: FontWeight.w600,
           color: Colors.black87,
         ),
+      ),
+    );
+  }
+
+  Widget _hint(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 15,
+          color: Colors.grey.shade500,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _visibilityToggle({
+    required bool obscured,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(
+        obscured
+            ? Icons.visibility_off_outlined
+            : Icons.visibility_outlined,
+        color: Colors.grey.shade500,
       ),
     );
   }
@@ -145,19 +227,41 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
     setState(() => _isSubmitting = true);
 
     try {
-      await ApiService.completeGoogleProfile(
-        nationalId: _idController.text.trim(),
-        phoneNumber:
-        _phoneProvided ? _phoneForBackend : null,
-      );
+      // 1. Save national ID and phone number.
+      if (!_profileSaved) {
+        await ApiService.completeGoogleProfile(
+          nationalId: _idController.text.trim(),
+          phoneNumber:
+          _phoneProvided ? _phoneForBackend : null,
+        );
+
+        if (!mounted) return;
+        setState(() => _profileSaved = true);
+      }
+
+      // 2. Optional password, so the user can also log in with email.
+      if (_passwordProvided && !_passwordSaved) {
+        await ApiService.setPassword(
+          password: _passwordController.text,
+          passwordConfirmation: _confirmController.text,
+        );
+
+        if (!mounted) return;
+        setState(() => _passwordSaved = true);
+      }
 
       if (!mounted) return;
 
-      // The backend has confirmed profile completion.
-      // Keep the existing authenticated session.
+      // 3. Verify the phone if one was given, otherwise go home.
+      // Either way, clear the setup screens from the stack.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => const HomePage(),
+          builder: (_) => _phoneProvided
+              ? VerifyPhonePage(
+            phoneNumber: _phoneForBackend,
+            fromSetup: true,
+          )
+              : const HomePage(),
         ),
             (route) => false,
       );
@@ -177,6 +281,10 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
         ? 'Google User'
         : widget.googleName.trim();
     final email = widget.googleEmail.trim();
+
+    // Once the profile is saved, ID and phone can no longer change here.
+    final detailsLocked = _isSubmitting || _profileSaved;
+    final passwordLocked = _isSubmitting || _passwordSaved;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -218,9 +326,9 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                                       'Use another account?',
                                     ),
                                     content: const Text(
-                                      'You will return to the previous '
-                                          'screen. Your current session '
-                                          'will not be cleared automatically.',
+                                      'You will be signed out of this '
+                                          'Google account and returned to '
+                                          'the login screen.',
                                     ),
                                     actions: [
                                       TextButton(
@@ -243,15 +351,25 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                                   ),
                             );
 
-                            if (confirmed == true &&
-                                mounted) {
-                              Navigator.of(
-                                context,
-                                rootNavigator: true,
-                              ).popUntil(
-                                    (route) => route.isFirst,
-                              );
+                            if (confirmed != true || !mounted) {
+                              return;
                             }
+
+                            // Revoke the token and sign out of Google
+                            // so the account picker shows next time.
+                            await ApiService.logout();
+
+                            if (!mounted) return;
+
+                            Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => LoginPage(),
+                              ),
+                                  (route) => false,
+                            );
                           },
                           child: Text(
                             'Use another account',
@@ -407,7 +525,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     TextField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
-                      enabled: !_isSubmitting,
+                      enabled: !detailsLocked,
                       onChanged: (_) => setState(() {}),
                       decoration: _decoration(
                         hint: 'e.g. 0712 345 678',
@@ -416,25 +534,9 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.sms_outlined,
-                          size: 15,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'We will text you a code to verify it later.',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ),
-                      ],
+                    _hint(
+                      Icons.sms_outlined,
+                      'We will text you a code to verify it next.',
                     ),
                     const SizedBox(height: 22),
 
@@ -443,7 +545,7 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     TextField(
                       controller: _idController,
                       keyboardType: TextInputType.number,
-                      enabled: !_isSubmitting,
+                      enabled: !detailsLocked,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                       ],
@@ -456,26 +558,55 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                       ).copyWith(counterText: ''),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 15,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Your national ID is used to verify your '
-                                'identity and check for duplicate accounts.',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12.5,
-                            ),
+                    _hint(
+                      Icons.lock_outline_rounded,
+                      'Your national ID is used to verify your '
+                          'identity and check for duplicate accounts.',
+                    ),
+                    const SizedBox(height: 22),
+
+                    // Optional password
+                    _label('Set a password (optional)'),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      enabled: !passwordLocked,
+                      onChanged: (_) => setState(() {}),
+                      decoration: _decoration(
+                        hint: 'At least 8 characters',
+                        icon: Icons.lock_outline_rounded,
+                        errorText: _passwordError,
+                        suffixIcon: _visibilityToggle(
+                          obscured: _obscurePassword,
+                          onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _confirmController,
+                      obscureText: _obscureConfirm,
+                      enabled: !passwordLocked,
+                      onChanged: (_) => setState(() {}),
+                      decoration: _decoration(
+                        hint: 'Confirm password',
+                        icon: Icons.lock_outline_rounded,
+                        errorText: _confirmError,
+                        suffixIcon: _visibilityToggle(
+                          obscured: _obscureConfirm,
+                          onPressed: () => setState(
+                                () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _hint(
+                      Icons.key_outlined,
+                      'Lets you also log in with your email and password. '
+                          'You can skip this and keep using Google.',
                     ),
                     const SizedBox(height: 20),
 

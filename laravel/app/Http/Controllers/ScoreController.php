@@ -48,6 +48,12 @@ class ScoreController extends Controller
 
         $user = $request->user();
 
+                if (config('services.scoring.require_phone_verification') && is_null($user->phone_verified_at)) {
+            return response()->json([
+                'message' => 'Verify your phone number in Profile before scoring a statement.',
+            ], 403);
+        }
+
         if (! $user->consents()->active()->where('purpose', Consent::STATEMENT_ANALYSIS)->exists()) {
             return response()->json(['message' => 'Consent for statement analysis is required.'], 403);
         }

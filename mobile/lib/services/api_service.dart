@@ -125,6 +125,40 @@ class ApiService {
     return _storage.delete(key: 'auth_token');
   }
 
+  /// Revokes the token on the server, signs out of Google, then clears the
+  /// local token. Server or Google failures never block the local logout.
+  static Future<void> logout() async {
+    final token = await getToken();
+
+    if (token != null && token.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('$baseUrl/logout'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 10));
+      } catch (_) {
+        // Offline or server down: still log out locally.
+      }
+    }
+
+    try {
+      if (!_googleInitialized) {
+        await _googleSignIn.initialize(
+          serverClientId: dotenv.env['GOOGLE_CLIENT_ID'],
+        );
+        _googleInitialized = true;
+      }
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Not a Google user, or Google unavailable.
+    }
+
+    await clearToken();
+  }
+
   static Future<Map<String, dynamic>> getProfile() async {
     final token = await getToken();
 
@@ -1025,6 +1059,42 @@ class ApiService {
     '/loan-requests/$id/withdraw',
     fallbackError: 'The loan request could not be withdrawn.',
   );
+  // ---------------------------------------------------------------- phone verification and password setup
+
+  /// Emails a fresh verification link to the signed-in user.
+  static Future<Map<String, dynamic>> sendEmailVerification() => _authedJson(
+    'POST',
+    '/email/verification-notification',
+    fallbackError: 'The verification email could not be sent.',
+  );
+
+  static Future<Map<String, dynamic>> sendPhoneCode() => _authedJson(
+    'POST',
+    '/phone/send-code',
+    fallbackError: 'The verification code could not be sent.',
+  );
+
+  static Future<Map<String, dynamic>> verifyPhoneCode(String code) => _authedJson(
+    'POST',
+    '/phone/verify',
+    body: {'code': code},
+    fallbackError: 'The code could not be verified.',
+  );
+
+  /// For Google users who have no password yet.
+  static Future<Map<String, dynamic>> setPassword({
+    required String password,
+    required String passwordConfirmation,
+  }) =>
+      _authedJson(
+        'POST',
+        '/set-password',
+        body: {
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+        },
+        fallbackError: 'Your password could not be set.',
+      );
   // ---------------------------------------------------------------- score and access history
 
   static Future<Map<String, dynamic>> getScoreHistory() => _authedJson(

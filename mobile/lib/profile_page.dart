@@ -6,6 +6,8 @@ import 'package:mtaaworks/login_page.dart';
 import '../services/api_service.dart';
 import 'edit_profile_page.dart';
 import 'change_password_page.dart';
+import 'set_password_page.dart';
+import 'verify_phone_page.dart';
 
 const Color _purple = Color(0xFF7C3AED);
 const Color _purpleSoft = Color(0xFFF3EEFF);
@@ -26,6 +28,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   bool _consent = false;
   bool _consentLoading = false;
+  bool _sendingEmailLink = false;
 
   String? _error;
   int _pendingRequests = 0;
@@ -36,6 +39,94 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String get _phone =>
       _profile?['phone_number']?.toString() ?? 'No phone number';
+
+  bool get _hasEmail =>
+      (_profile?['email']?.toString() ?? '').trim().isNotEmpty;
+
+  bool get _emailVerified => _profile?['email_verified_at'] != null;
+
+  Future<void> _sendEmailVerification() async {
+    if (_sendingEmailLink) return;
+
+    setState(() => _sendingEmailLink = true);
+
+    try {
+      final result = await ApiService.sendEmailVerification();
+
+      if (!mounted) return;
+
+      // The backend answers 200 "Email already verified." in that case,
+      // so refresh the profile instead of telling the user to check email.
+      final sentMessage = result['message']?.toString() ?? '';
+
+      if (sentMessage.toLowerCase().contains('already verified')) {
+        await _loadProfile();
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${result['message'] ?? 'Verification link sent.'} '
+                'Open it, then pull down here to refresh.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      final message = e.toString().replaceFirst('Exception: ', '');
+
+      // Already verified elsewhere: just refresh so the row disappears.
+      if (message.toLowerCase().contains('already verified')) {
+        await _loadProfile();
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _sendingEmailLink = false);
+      }
+    }
+  }
+
+  bool get _hasPhone =>
+      (_profile?['phone_number']?.toString() ?? '').trim().isNotEmpty;
+
+  bool get _phoneVerified => _profile?['phone_verified_at'] != null;
+
+  // Defaults to true if the backend does not send the field,
+  // so the existing change-password flow is kept.
+  bool get _hasPassword => _profile?['has_password'] != false;
+
+  Future<void> _openPasswordPage() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => _hasPassword
+            ? const ChangePasswordPage()
+            : const SetPasswordPage(),
+      ),
+    );
+
+    if (changed == true && mounted) {
+      await _loadProfile();
+    }
+  }
+
+  Future<void> _openVerifyPhone() async {
+    final verified = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VerifyPhonePage(phoneNumber: _phone),
+      ),
+    );
+
+    if (verified == true && mounted) {
+      await _loadProfile();
+    }
+  }
 
   String get _maskedNationalId {
     final id = _profile?['national_id']?.toString() ?? '';
@@ -197,6 +288,15 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  // Removes every route (including Home and its tabs) and shows Login,
+  // so no signed-in screen stays alive underneath.
+  void _goToLogin() {
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => LoginPage()),
+      (route) => false,
+    );
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -205,14 +305,11 @@ class _ProfilePageState extends State<ProfilePage> {
         content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => LoginPage(),)
-                ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Log out'),
           ),
         ],
@@ -221,12 +318,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (confirmed != true || !mounted) return;
 
-    await ApiService.clearToken();
+    await ApiService.logout();
 
     if (!mounted) return;
 
-    Navigator.of(context, rootNavigator: true)
-        .popUntil((route) => route.isFirst);
+    _goToLogin();
   }
 
   Future<void> _openDeleteSheet() async {
@@ -245,7 +341,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (deleted != true || !mounted) return;
 
     try {
-      await ApiService.clearToken();
+      await ApiService.logout();
     } catch (e) {
       if (!mounted) return;
 
@@ -261,8 +357,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (!mounted) return;
 
-    Navigator.of(context, rootNavigator: true)
-        .popUntil((route) => route.isFirst);
+    _goToLogin();
   }
 
   @override
@@ -446,16 +541,31 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 8),
             _Card(
               children: [
+                if (_hasEmail && !_emailVerified)
+                  _SettingsRow(
+                    icon: Icons.mark_email_unread_outlined,
+                    title: 'Verify email address',
+                    subtitle: _sendingEmailLink
+                        ? 'Sending link...'
+                        : 'Not verified · we will email you a link',
+                    onTap: _sendingEmailLink
+                        ? null
+                        : _sendEmailVerification,
+                  ),
+                if (_hasPhone && !_phoneVerified)
+                  _SettingsRow(
+                    icon: Icons.sms_outlined,
+                    title: 'Verify phone number',
+                    subtitle: 'Not verified · we will text you a code',
+                    onTap: _openVerifyPhone,
+                  ),
                 _SettingsRow(
                   icon: Icons.password_rounded,
-                  title: 'Change password',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ChangePasswordPage(),
-                      ),
-                    );
-                  },
+                  title: _hasPassword ? 'Change password' : 'Set password',
+                  subtitle: _hasPassword
+                      ? null
+                      : 'You sign in with Google · add a password',
+                  onTap: _openPasswordPage,
                   last: true,
                 ),
               ],
@@ -679,7 +789,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
 
       if (!mounted) return;
 
-      // The parent clears the token and navigates to the entry screen.
+      // The parent clears the token and navigates to the login screen.
       Navigator.of(context).pop(true);
     } catch (e) {
       _showMessage(_errorMessage(e));

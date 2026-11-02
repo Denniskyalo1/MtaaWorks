@@ -28,14 +28,19 @@ class ProfileController extends Controller
 
          return response()->json([
             'message' => 'User info retrieved successfully.',
-            'user' => $user->only([
-                'id',
-                'name',
-                'email',
-                'phone_number',
-                'national_id',
-                'identity_verification_status',
-            ])
+            'user' => array_merge(
+                $user->only([
+                    'id',
+                    'name',
+                    'email',
+                    'phone_number',
+                    'national_id',
+                    'identity_verification_status',
+                    'phone_verified_at',
+                    'email_verified_at',
+                ]),
+                ['has_password' => !is_null($user->password)]
+            ),
         ]);
     }
 

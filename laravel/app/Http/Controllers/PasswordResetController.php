@@ -9,6 +9,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 
     class PasswordResetController extends Controller
     {
@@ -31,6 +32,33 @@ use Illuminate\Support\Str;
             ]);
 
         }
+
+            /**
+     * Set Password
+     *
+     * Lets a user who signed up with Google add a password for the first time.
+     */
+    public function setPassword(Request $request)
+    {
+        $user = $request->user();
+
+        if (!is_null($user->password)) {
+            return response()->json([
+                'message' => 'You already have a password. Use change password instead.',
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user->password = Hash::make($validated['password']);
+        $user->save();
+
+        return response()->json([
+            'message' => 'Password set successfully.',
+        ]);
+    }
 
         /**
      * Request Password Reset

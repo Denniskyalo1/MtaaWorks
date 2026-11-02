@@ -77,6 +77,7 @@ Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']
         Route::get('/show', [ProfileController::class, 'show']);
         Route::patch('/update',[ProfileController::class, 'update']);
         Route::post('/change-password', [PasswordResetController::class, 'changePassword']);
+        Route::post('/set-password', [PasswordResetController::class, 'setPassword']);
         Route::get('/email/verification-status',[EmailVerificationController::class, 'status']);
         Route::post('/email/verification-notification',[EmailVerificationController::class, 'resend'])->middleware('throttle:6,1');
         Route::post('/profile/complete', [ProfileController::class, 'complete']);

@@ -58,4 +58,8 @@ return [
         'url' => env('PORTAL_URL', 'http://localhost:5000'),
     ],
 
+    'scoring' => [
+        'require_phone_verification' => env('REQUIRE_PHONE_VERIFICATION', false),
+    ],
+
 ];
