@@ -13,12 +13,12 @@ A borrower consents to share a password-protected M-Pesa statement, receives a s
 | `ml-service` | Scoring service: statement reader, model, credit report PDF | Python, FastAPI, scikit-learn |
 | `laravel` | Backend API: accounts, consent, roles, lender access, loan requests, reports | Laravel 13, Sanctum, MySQL or SQLite |
 | `mobile` | Borrower app (Android emulator or phone) | Flutter |
-| `mobile/mtaaworks_lender_portal` | Lender web portal | Flutter web |
+| `mobile/mtaaworks_lender_portal` | Lender and admin web portal | Flutter web |
 
 ```
-Borrower app ──┐                         ┌── Scoring service (port 8000)
-               ├──> Laravel API (8001) ──┤    reads the statement, scores it
-Lender portal ─┘                         └── Database
+Borrower app ──────┐                         ┌── Scoring service (port 8000)
+                   ├──> Laravel API (8001) ──┤    reads the statement, scores it
+Lender/admin portal┘                         └── Database
  (port 5000)
 ```
 
@@ -26,11 +26,13 @@ Lender portal ─┘                         └── Database
 
 - Synthetic data generator, model training and evaluation (Logistic Regression, AUC-ROC 0.746 on the held-out test set).
 - Statement reader with a fast reader and a fall-back reader, a check of its output against the statement's own totals, scoring of up to six statements of one account together, and a check that the name and phone number on the statement match the signed-in borrower.
-- Registration, sign-in (including Google), email and phone verification, consent, and account deletion.
+- Registration, sign-in (including Google), email and phone verification (also from the profile), a set-password option for Google sign-ups, consent, and account deletion.
+- An optional rule that a borrower must verify their phone before scoring (`REQUIRE_PHONE_VERIFICATION`).
 - Score history, a record of who opened the score, and scores stored encrypted.
 - Lender requests, loan requests, and a lender portfolio summary.
 - A PDF credit report with a verification code and QR code that a lender can check in the portal, and that the borrower can withdraw.
 - Role checks (borrower, lender, admin) and server-side logout for every role.
+- Admin pages in the portal: dashboard counts (no individual scores), adding lenders, suspending and reactivating them, a user list with masked phone and ID numbers, switching an account between borrower and admin, and an audit log of admin actions and lender score views.
 
 Not implemented: automatic statement retrieval through the Daraja API, a hosted deployment with a real certificate, a usability study with real users, and an independent security review. Everything was tested on one development machine.
 
@@ -88,6 +90,7 @@ Open `laravel\.env` and set:
 | Setting | Value |
 |---|---|
 | `SCORING_SERVICE_KEY` | The same string you used in step 1 |
+| `APP_URL` | `http://127.0.0.1:8001`. Links in emails are built from it. |
 | `ADMIN_EMAIL` and `ADMIN_PASSWORD` | The administrator account you want to create |
 | `DB_CONNECTION` | Leave as `sqlite`, or switch to the MySQL block and create an empty database first |
 
@@ -106,6 +109,10 @@ API documentation: http://localhost:8001/docs/api
 ### 3. Create a lender account (once)
 
 Lenders cannot register themselves. The administrator creates them.
+
+**In the portal (easiest).** Start the portal (step 4), sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`, open **Lenders** and choose **Add lender**. The admin pages also let you suspend or reactivate a lender, manage roles under **Users**, and read the **Audit log**.
+
+**Or through the API:**
 
 ```powershell
 $login = Invoke-RestMethod -Method Post -Uri http://localhost:8001/api/login -ContentType "application/json" `
@@ -128,6 +135,8 @@ flutter run -d chrome --web-port=5000
 ```
 
 The port matters: the backend builds the links in lender emails and report QR codes from `PORTAL_URL`, which is `http://localhost:5000` by default. The portal talks to the backend at `http://127.0.0.1:8001/api` (`lib/api_service.dart`).
+
+The same portal serves lenders and admins: after sign-in, an admin account opens the admin pages and a lender account opens the lender dashboard. Borrower accounts are refused and pointed to the mobile app.
 
 ### 5. Borrower app (terminal 4)
 
@@ -160,6 +169,8 @@ The arguments are the output file, the PDF password, the start date, the number 
 4. Read the score, tier and reasons. Try **Score history**, **Who viewed**, and **Credit report (PDF)**.
 5. As the lender (portal), sign in, send an access request for the borrower's score, and approve it in the app; the lender can then open the score. Use **Verify report** in the portal with the code on the PDF report.
 
+If `REQUIRE_PHONE_VERIFICATION=true` in `laravel\.env`, the borrower must verify their phone first (Profile → **Verify phone number**). With Africa's Talking in sandbox mode the code appears in the Africa's Talking simulator, not on a real phone, so leave the setting `false` when other people test the system.
+
 A statement needs at least three full calendar months with no missing month in between, and it must be a PDF of up to 25 MB. The synthetic statement has no customer name, so the name check is skipped for it; on a real statement the name and phone number must match the signed-in borrower.
 
 ## Run the tests
@@ -179,7 +190,7 @@ New-Item mtaaworks_test -ItemType File   # empty SQLite file the tests use; it i
 php artisan test
 ```
 
-The scoring-service result was checked on a fresh clone of this repository. The backend result (50 passed) was recorded on the development machine with PHP 8.5.
+The scoring-service result was checked on a fresh clone of this repository. The backend result (50 passed) was recorded on the development machine with PHP 8.5. The admin pages, the phone-verification rule and the set-password option for Google sign-ups have no automated tests yet; they were tested by hand through the portal and the app.
 
 ## HTTPS test (optional)
 
@@ -199,7 +210,9 @@ Use the `https://...trycloudflare.com` address it prints, with `/api` added, as 
 | Scoring service (environment) | `STATEMENT_PARSER` | `auto` (default), `fast` or `reliable` |
 | Scoring service (environment) | `STATEMENT_IDENTITY_CHECK` | Set to `off` to skip the name and phone check |
 | `laravel\.env` | `SCORING_SERVICE_URL`, `SCORING_SERVICE_KEY` | Where the scoring service is and its shared secret |
+| `laravel\.env` | `APP_URL` | The backend's own address; links in emails (such as email verification) are built from it |
 | `laravel\.env` | `PORTAL_URL` | Where the lender portal runs (default `http://localhost:5000`) |
+| `laravel\.env` | `REQUIRE_PHONE_VERIFICATION` | `true` refuses scoring until the borrower's phone is verified (default `false`). Run `php artisan config:clear` after changing it. |
 | `laravel\.env` | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Used by `AdminSeeder` |
 | `laravel\.env` | `GOOGLE_CLIENT_ID` | Optional, for Google sign-in |
 | `laravel\.env` | `AT_USERNAME`, `AT_API_KEY`, `AT_SANDBOX`, `AT_SENDER_ID` | Optional, SMS for phone verification (Africa's Talking) |
@@ -219,6 +232,10 @@ Do not commit `.env` files. Only the `.env.example` files are stored in the repo
 | The borrower app shows "route could not be found" | `baseUrl` in `lib/services/api_service.dart` is missing `/api` at the end |
 | The borrower app cannot reach the backend on a phone | `10.0.2.2` only works in the emulator. Use the computer's LAN address. |
 | A lender's set-password link does not open | The portal must be running on port 5000 (or `PORTAL_URL` changed to match) |
+| An email verification link points to `10.0.2.2` and does not open | Set `APP_URL=http://127.0.0.1:8001` in `laravel\.env`, run `php artisan config:clear`, and request a new link. Old emails keep the old link. |
+| `php artisan serve` says port 8000 or 8001 is forbidden | Windows sometimes reserves ports. Use another port (for example `--port=8002` for the scoring service) and update `SCORING_SERVICE_URL` in `laravel\.env` to match. |
+| A lender cannot sign in: "This lender account is suspended" | An admin suspended the lender. Reactivate it in the portal under **Lenders**. |
+| The admin account cannot sign in to the portal | Run `php artisan db:seed --class=AdminSeeder` after setting `ADMIN_EMAIL` and `ADMIN_PASSWORD`, then run `php artisan migrate` if the `audit_logs` table is missing. |
 
 ## Repository notes
 
