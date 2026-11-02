@@ -43,6 +43,7 @@ return [
    'scoring' => [
     'url' => env('SCORING_SERVICE_URL'),
     'key' => env('SCORING_SERVICE_KEY'),
+    'require_phone_verification' => env('REQUIRE_PHONE_VERIFICATION', false),
   ],
 
 
@@ -56,10 +57,6 @@ return [
 
     'portal' => [
         'url' => env('PORTAL_URL', 'http://localhost:5000'),
-    ],
-
-    'scoring' => [
-        'require_phone_verification' => env('REQUIRE_PHONE_VERIFICATION', false),
     ],
 
 ];
