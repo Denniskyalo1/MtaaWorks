@@ -8,6 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
 from src.api import app, META
+from src.api import score_values, FEATURES, RANGES
+
 
 client = TestClient(app)
 
@@ -53,6 +55,12 @@ def test_strong_profile_scores_higher_than_weak():  # TC-S04
     assert strong["score"] > weak["score"]
     assert strong["probability_of_default"] < weak["probability_of_default"]
 
+def test_out_of_range_values_are_clipped_not_extrapolated():
+    at_max = {f: RANGES[f][1] for f in FEATURES}
+    extreme = dict(at_max, transaction_count_monthly=RANGES["transaction_count_monthly"][1] * 10)
+    a, b = score_values(at_max), score_values(extreme)
+    assert b.probability_of_default == a.probability_of_default
+    assert "transaction_count_monthly" in b.out_of_range_features
 
 def test_missing_feature_is_rejected():  # TC-S05
     bad = {k: v for k, v in TYPICAL.items() if k != "loan_repayment_regularity"}

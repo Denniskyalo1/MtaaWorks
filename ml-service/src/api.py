@@ -141,15 +141,17 @@ def explain(row: pd.DataFrame) -> list[Driver]:
         for f, c in ranked
     ]
 
-
 def score_values(values: dict) -> ScoreResponse:
     row = pd.DataFrame([values], columns=FEATURES)
-    p = float(calibrated_model.predict_proba(row)[0, 1])
-    score_value = round((1 - p) * 100, 1)
     out_of_range = [
         f for f in FEATURES
         if not (RANGES[f][0] <= float(row[f].iloc[0]) <= RANGES[f][1])
     ]
+    # Clip to the training range so the model never extrapolates beyond data it has seen.
+    for f in FEATURES:
+        row[f] = row[f].clip(RANGES[f][0], RANGES[f][1])
+    p = float(calibrated_model.predict_proba(row)[0, 1])
+    score_value = round((1 - p) * 100, 1)
     return ScoreResponse(
         probability_of_default=round(p, 4),
         score=score_value,
