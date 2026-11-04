@@ -1,5 +1,7 @@
 # MtaaWorks
 
+![Tests](https://github.com/Denniskyalo1/MtaaWorks/actions/workflows/tests.yml/badge.svg)
+
 Machine learning credit scoring for informal-sector borrowers in Kenya (final-year project, Strathmore University).
 
 A borrower consents to share a password-protected M-Pesa statement, receives a score out of 100 and a risk tier (Tier 1 is the strongest) with the main reasons behind it, and then chooses which lender may see it. A lender sees only what the borrower approved, for 30 days.
