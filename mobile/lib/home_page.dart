@@ -124,7 +124,7 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         _profileError =
-            e.toString().replaceFirst('Exception: ', '');
+            friendlyError(e);
         _isLoadingProfile = false;
       });
     }
@@ -148,8 +148,7 @@ class _HomePageState extends State<HomePage> {
           _score = null;
           _tier = null;
           _lastScored = null;
-          _scoreError = response['message']?.toString() ??
-              'No credit score yet. Score a statement to get started.';
+          _scoreError = null;
           _isLoadingScore = false;
         });
         return;
@@ -189,7 +188,7 @@ class _HomePageState extends State<HomePage> {
         _tier = null;
         _lastScored = null;
         _scoreError =
-            e.toString().replaceFirst('Exception: ', '');
+            friendlyError(e);
         _isLoadingScore = false;
       });
     }
@@ -449,7 +448,9 @@ class _HomeBody extends StatelessWidget {
                 end: Alignment.bottomCenter,
               ),
             ),
-            child: Column(
+            child: (!isLoadingScore && score == null && scoreError == null)
+                ? _FirstScoreGuide(consentActive: consentActive)
+                : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -572,9 +573,9 @@ class _HomeBody extends StatelessWidget {
                 Icons.upload_file_rounded,
                 color: Colors.black,
               ),
-              label: const Text(
-                'Score a statement',
-                style: TextStyle(
+              label: Text(
+                consentActive == true ? 'Score a statement' : 'Get started',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Colors.black,
@@ -957,6 +958,126 @@ class _ActivityTile extends StatelessWidget {
         ],
       ),
       ),
+      ),
+    );
+  }
+}
+/// Shown in the score card until the borrower has a first score.
+class _FirstScoreGuide extends StatelessWidget {
+  const _FirstScoreGuide({required this.consentActive});
+
+  final bool? consentActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool consentDone = consentActive == true;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Get your first score',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Three steps. Scoring takes about a minute.',
+          style: TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        const SizedBox(height: 18),
+        _GuideStep(
+          number: 1,
+          done: consentDone,
+          title: 'Give consent',
+          detail: 'Allow MtaaWorks to analyse your statement.',
+        ),
+        const _GuideStep(
+          number: 2,
+          done: false,
+          title: 'Upload your M-PESA statement',
+          detail: 'A PDF covering at least 3 full months, with its password. '
+              'You can request a full statement from the M-PESA app.',
+        ),
+        const _GuideStep(
+          number: 3,
+          done: false,
+          title: 'See your score',
+          detail: 'Your tier and what helped or held it back.',
+          last: true,
+        ),
+      ],
+    );
+  }
+}
+
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({
+    required this.number,
+    required this.done,
+    required this.title,
+    required this.detail,
+    this.last = false,
+  });
+
+  final int number;
+  final bool done;
+  final String title;
+  final String detail;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? const Color(0xFF1E8E4E) : Colors.white12,
+              border: Border.all(color: done ? const Color(0xFF1E8E4E) : Colors.white38),
+            ),
+            child: done
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 16)
+                : Text(
+              '$number',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  done ? '$title (done)' : title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

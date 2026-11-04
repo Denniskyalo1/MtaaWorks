@@ -43,7 +43,7 @@ class _ConsentPageState extends State<ConsentPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = friendlyError(e);
       });
     } finally {
       if (mounted) {

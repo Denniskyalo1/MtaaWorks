@@ -135,7 +135,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
+            friendlyError(e),
           ),
           duration: const Duration(seconds: 5),
         ),

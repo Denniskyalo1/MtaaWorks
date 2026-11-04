@@ -34,7 +34,7 @@ class _LoanRequestsPageState extends State<LoanRequestsPage> {
     try {
       _loans = await ApiService.getLoanRequests();
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -142,7 +142,7 @@ class _LoanRequestsPageState extends State<LoanRequestsPage> {
       _message(message);
       await _load();
     } catch (e) {
-      _message(e.toString().replaceFirst('Exception: ', ''), error: true);
+      _message(friendlyError(e), error: true);
     }
   }
 

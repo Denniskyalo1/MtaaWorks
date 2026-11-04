@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -13,6 +16,38 @@ class ApiService {
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
   static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   static bool _googleInitialized = false;
+
+  static String _googleErrorMessage(GoogleSignInException e) {
+    switch (e.code) {
+      case GoogleSignInExceptionCode.canceled:
+        return 'Google sign-in was cancelled.';
+      case GoogleSignInExceptionCode.interrupted:
+      case GoogleSignInExceptionCode.uiUnavailable:
+        return 'Google sign-in was interrupted. Please try again.';
+      case GoogleSignInExceptionCode.clientConfigurationError:
+      case GoogleSignInExceptionCode.providerConfigurationError:
+        return 'Google sign-in is not available in this version of the app. '
+            'Please sign in with your email instead.';
+      default:
+        return 'Google sign-in did not work on this phone. Check that a Google '
+            'account is added in Settings, or sign in with your email instead.';
+    }
+  }
+
+  /// Reads a JSON reply. If the server sent something else (an HTML error
+  /// page, an empty body or a cut-off reply), throws a readable message
+  /// instead of a FormatException.
+  static dynamic _decodeBody(http.Response response) {
+    try {
+      return jsonDecode(response.body);
+    } on FormatException {
+      if (response.statusCode >= 500 || response.body.trim().isEmpty) {
+        throw Exception(
+            'The server had a problem. Please try again in a moment.');
+      }
+      throw Exception('Unexpected reply from the server. Please try again.');
+    }
+  }
 
   static Future<Map<String, dynamic>> register({
     required String name,
@@ -42,7 +77,7 @@ class ApiService {
       }),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -90,7 +125,7 @@ class ApiService {
       }),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -191,7 +226,7 @@ class ApiService {
       },
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -227,7 +262,7 @@ class ApiService {
     );
 
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -302,7 +337,7 @@ class ApiService {
 
     final response = await http.Response.fromStream(streamedResponse);
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -360,7 +395,7 @@ class ApiService {
       }),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -414,7 +449,7 @@ class ApiService {
       },
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -448,7 +483,7 @@ class ApiService {
       },
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -517,7 +552,12 @@ class ApiService {
       _googleInitialized = true;
     }
 
-    final account = await _googleSignIn.authenticate();
+    final GoogleSignInAccount account;
+    try {
+      account = await _googleSignIn.authenticate();
+    } on GoogleSignInException catch (e) {
+      throw Exception(_googleErrorMessage(e));
+    }
 
     // Obtain the Google ID token for Laravel to verify.
     final idToken = account.authentication.idToken;
@@ -537,7 +577,7 @@ class ApiService {
       }),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -593,7 +633,7 @@ class ApiService {
       },
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -637,7 +677,7 @@ class ApiService {
       },
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -709,7 +749,7 @@ class ApiService {
       body: jsonEncode(body),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -776,7 +816,7 @@ class ApiService {
       }),
     );
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -868,7 +908,7 @@ class ApiService {
     Map<String, dynamic> decoded;
 
     try {
-      final dynamic result = jsonDecode(response.body);
+      final dynamic result = _decodeBody(response);
 
       if (result is! Map<String, dynamic>) {
         throw Exception('Unexpected response from the server.');
@@ -932,7 +972,7 @@ class ApiService {
     Map<String, dynamic> data;
 
     try {
-      final decoded = jsonDecode(response.body);
+      final decoded = _decodeBody(response);
 
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException();
@@ -1017,7 +1057,7 @@ class ApiService {
         ? await http.get(uri, headers: headers)
         : await http.post(uri, headers: headers, body: jsonEncode(body ?? {}));
 
-    final dynamic decoded = jsonDecode(response.body);
+    final dynamic decoded = _decodeBody(response);
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Unexpected response from the server.');
@@ -1165,7 +1205,7 @@ class ApiService {
 
     var message = 'The report could not be downloaded.';
     try {
-      final decoded = jsonDecode(response.body);
+      final decoded = _decodeBody(response);
       if (decoded is Map && decoded['message'] != null) {
         message = decoded['message'].toString();
       }
@@ -1173,4 +1213,25 @@ class ApiService {
 
     throw Exception(message);
   }
+}
+
+/// Turns any error into a message a borrower can act on.
+/// Use it wherever a screen shows an error: Text(friendlyError(e)).
+String friendlyError(Object e) {
+  if (e is TimeoutException) {
+    return 'The server is taking too long to reply. Check your connection and try again.';
+  }
+  if (e is HandshakeException) {
+    return 'A secure connection could not be made on this network. '
+        'Try mobile data or a different Wi-Fi.';
+  }
+  if (e is SocketException || e is http.ClientException) {
+    return 'Could not reach MtaaWorks. Check your internet connection and try again.';
+  }
+  final text = friendlyError(e);
+  // Anything that still looks technical gets a plain fallback.
+  if (text.contains('Exception') || text.contains('errno') || text.contains('uri=')) {
+    return 'Something went wrong. Please try again.';
+  }
+  return text;
 }

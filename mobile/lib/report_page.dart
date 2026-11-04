@@ -52,7 +52,7 @@ class _ReportPageState extends State<ReportPage> {
       final list = response['reports'];
       _reports = list is List ? list.whereType<Map<String, dynamic>>().toList() : [];
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -65,7 +65,7 @@ class _ReportPageState extends State<ReportPage> {
       await _load();
       _message('Report created. Download it to share it.');
     } catch (e) {
-      _message(e.toString().replaceFirst('Exception: ', ''));
+      _message(friendlyError(e));
     } finally {
       if (mounted) setState(() => _creating = false);
     }
@@ -84,7 +84,7 @@ class _ReportPageState extends State<ReportPage> {
       );
       _message(saved == null ? 'Saving was cancelled.' : 'Report saved.');
     } catch (e) {
-      _message(e.toString().replaceFirst('Exception: ', ''));
+      _message(friendlyError(e));
     }
   }
 
@@ -106,7 +106,7 @@ class _ReportPageState extends State<ReportPage> {
       await ApiService.revokeReport(id);
       await _load();
     } catch (e) {
-      _message(e.toString().replaceFirst('Exception: ', ''));
+      _message(friendlyError(e));
     }
   }
 

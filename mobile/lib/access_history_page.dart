@@ -44,7 +44,7 @@ class _AccessHistoryPageState extends State<AccessHistoryPage> {
       final list = response['events'];
       _events = list is List ? list.whereType<Map<String, dynamic>>().toList() : [];
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

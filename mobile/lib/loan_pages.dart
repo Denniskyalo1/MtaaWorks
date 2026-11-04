@@ -44,7 +44,7 @@ class _LoanRequestsPageState extends State<LoanRequestsPage> {
       final list = response['loan_requests'];
       _loans = list is List ? list.whereType<Map<String, dynamic>>().toList() : [];
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -74,7 +74,7 @@ class _LoanRequestsPageState extends State<LoanRequestsPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -244,7 +244,7 @@ class _RequestLoanPageState extends State<RequestLoanPage> {
       final list = response['lenders'];
       _lenders = list is List ? list.whereType<Map<String, dynamic>>().toList() : [];
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -274,7 +274,7 @@ class _RequestLoanPageState extends State<RequestLoanPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        SnackBar(content: Text(friendlyError(e))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);

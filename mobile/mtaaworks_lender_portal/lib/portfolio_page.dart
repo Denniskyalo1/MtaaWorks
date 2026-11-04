@@ -33,7 +33,7 @@ class _PortfolioPageState extends State<PortfolioPage> {
     try {
       _data = await ApiService.getPortfolio();
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

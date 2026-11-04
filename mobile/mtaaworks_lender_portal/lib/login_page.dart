@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage = friendlyError(e);
       });
     } finally {
       if (mounted) {

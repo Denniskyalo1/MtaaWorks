@@ -388,8 +388,34 @@ class ScoreResultPage extends StatelessWidget {
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        alignment: WrapAlignment.center,
+                                                alignment: WrapAlignment.center,
                         children: [
+                          if (outOfRange.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _amberSoft,
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(color: _amberBorder),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.info_outline_rounded,
+                                      color: _amber, size: 16),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Less certain',
+                                    style: TextStyle(
+                                      color: _amberText,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 18, vertical: 8),
@@ -469,6 +495,56 @@ class ScoreResultPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    
+                    // Notes (only when there is something to say)
+                    if (outOfRange.isNotEmpty || imputed.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _amberSoft,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _amberBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded,
+                                    color: _amber, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Things to know about this score',
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _amberText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            if (outOfRange.isNotEmpty)
+                              _NoteLine(
+                                'Some of your figures (${_joinPhrases(outOfRange.map((f) => _driverTitle(f).toLowerCase()).toList())}) '
+                                    'were well outside the data the model learned from. '
+                                    'They were treated as the highest values it knows, so '
+                                    'this score is less certain and a lender should review it.',
+                              ),
+                            ...imputed.map(
+                                  (f) => _NoteLine(
+                                f == 'loan_repayment_regularity'
+                                    ? 'No loan repayment history was found, so a typical '
+                                    'value was used for that part.'
+                                    : '${_driverTitle(f)} could not be worked out from '
+                                    'your statement, so a typical value was used.',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     // Helping
                     if (helping.isNotEmpty) ...[
@@ -513,54 +589,6 @@ class ScoreResultPage extends StatelessWidget {
                       ),
                     ],
 
-                    // Notes (only when there is something to say)
-                    if (outOfRange.isNotEmpty || imputed.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _amberSoft,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _amberBorder),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.info_outline_rounded,
-                                    color: _amber, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Things to know about this score',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _amberText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            if (outOfRange.isNotEmpty)
-                              _NoteLine(
-                                'Some of your figures (${_joinPhrases(outOfRange.map((f) => _driverTitle(f).toLowerCase()).toList())}) '
-                                    'were unusual compared with the data the model learned '
-                                    'from, so this score is less certain.',
-                              ),
-                            ...imputed.map(
-                                  (f) => _NoteLine(
-                                f == 'loan_repayment_regularity'
-                                    ? 'No loan repayment history was found, so a typical '
-                                    'value was used for that part.'
-                                    : '${_driverTitle(f)} could not be worked out from '
-                                    'your statement, so a typical value was used.',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 16),
 
                     // Details

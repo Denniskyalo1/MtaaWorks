@@ -117,7 +117,7 @@ class _LenderRequestsPageState extends State<LenderRequestsPage> {
       if (!mounted) return;
 
       setState(() {
-        loadError = e.toString().replaceFirst('Exception: ', '');
+        loadError = friendlyError(e);
         isLoading = false;
       });
     }
@@ -190,7 +190,7 @@ class _LenderRequestsPageState extends State<LenderRequestsPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          content: Text(friendlyError(e)),
           backgroundColor: red,
         ),
       );

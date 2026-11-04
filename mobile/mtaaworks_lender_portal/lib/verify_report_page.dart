@@ -48,7 +48,7 @@ class _VerifyReportPageState extends State<VerifyReportPage> {
       final r = await ApiService.verifyReport(_code.text);
       if (mounted) setState(() => _result = r);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _checking = false);
     }

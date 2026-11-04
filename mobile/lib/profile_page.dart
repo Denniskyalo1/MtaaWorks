@@ -76,7 +76,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (!mounted) return;
 
-      final message = e.toString().replaceFirst('Exception: ', '');
+      final message = friendlyError(e);
 
       // Already verified elsewhere: just refresh so the row disappears.
       if (message.toLowerCase().contains('already verified')) {
@@ -198,7 +198,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
 
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = friendlyError(e);
         _isLoading = false;
       });
     }
@@ -278,7 +278,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
+            friendlyError(e),
           ),
         ),
       );
@@ -350,7 +350,7 @@ class _ProfilePageState extends State<ProfilePage> {
         SnackBar(
           content: Text(
             'Account deleted, but clearing the local session failed: '
-                '${e.toString().replaceFirst('Exception: ', '')}',
+                '${friendlyError(e)}',
           ),
         ),
       );

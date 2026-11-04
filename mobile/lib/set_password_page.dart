@@ -72,7 +72,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       _showMessage('Password set. You can now also log in with your email.');
       Navigator.of(context).pop(true);
     } catch (e) {
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showMessage(friendlyError(e));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);

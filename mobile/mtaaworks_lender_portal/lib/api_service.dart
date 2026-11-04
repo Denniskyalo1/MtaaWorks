@@ -1,10 +1,10 @@
-
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 class ApiService {
-    static const String baseUrl = String.fromEnvironment(
+  static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://127.0.0.1:8001/api',
   );
@@ -45,9 +45,25 @@ class ApiService {
     }
 
     final message = body['message']?.toString() ??
-        'Request failed with status ${response.statusCode}.';
+        (response.statusCode >= 500
+            ? 'The server had a problem. Please try again in a moment.'
+            : 'Something went wrong (error ${response.statusCode}). Please try again.');
 
     throw Exception(message);
+  }
+  /// Reads a JSON reply. If the server sent something else (an HTML error
+  /// page, an empty body or a cut-off reply), throws a readable message
+  /// instead of a FormatException.
+  static dynamic _decodeBody(http.Response response) {
+    try {
+      return jsonDecode(response.body);
+    } on FormatException {
+      if (response.statusCode >= 500 || response.body.trim().isEmpty) {
+        throw Exception(
+            'The server had a problem. Please try again in a moment.');
+      }
+      throw Exception('Unexpected reply from the server. Please try again.');
+    }
   }
 
   /// Shared request helper for the admin calls.
@@ -286,7 +302,7 @@ class ApiService {
         .timeout(const Duration(seconds: 20));
 
     if (response.statusCode == 200 || response.statusCode == 404) {
-      final decoded = jsonDecode(response.body);
+      final decoded = _decodeBody(response);
       if (decoded is Map<String, dynamic>) return decoded;
     }
 
@@ -366,4 +382,20 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getAccessEvents({int page = 1}) =>
       _send('GET', '/admin/access-events', query: {'page': '$page'});
+}
+
+/// Turns any error into a message a user can act on.
+String friendlyError(Object e) {
+  if (e is TimeoutException) {
+    return 'The server is taking too long to reply. Check your connection and try again.';
+  }
+  // In the browser every connection failure arrives as a ClientException.
+  if (e is http.ClientException) {
+    return 'Could not reach MtaaWorks. Check your internet connection and try again.';
+  }
+  final text = friendlyError(e);
+  if (text.contains('Exception') || text.contains('errno') || text.contains('uri=')) {
+    return 'Something went wrong. Please try again.';
+  }
+  return text;
 }

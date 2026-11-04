@@ -49,7 +49,7 @@ class _ScoreHistoryPageState extends State<ScoreHistoryPage> {
       final list = response['scores'];
       _scores = list is List ? list.whereType<Map<String, dynamic>>().toList() : [];
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      _error = friendlyError(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

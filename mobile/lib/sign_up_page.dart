@@ -79,7 +79,7 @@ class _SignUpPageState extends State<SignUpPage> {
     } catch (e, stackTrace) {
       if (!mounted) return;
 
-      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      final errorMessage = friendlyError(e);
 
       developer.log(
         'Registration failed',
@@ -135,7 +135,7 @@ class _SignUpPageState extends State<SignUpPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
+            friendlyError(e),
           ),
         ),
       );
