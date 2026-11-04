@@ -94,4 +94,14 @@ class ScoreIdentityTest extends TestCase
 
         $this->assertSame(0, $user->creditScores()->count());
     }
+
+    public function test_scoring_is_refused_when_verification_is_required_and_phone_is_unverified(): void
+    {
+        config(['services.scoring.require_phone_verification' => true]);
+        $this->fakeScoringService();
+        $this->borrower();
+
+        $this->post('/api/scores', ['statement' => $this->pdf(), 'password' => 'x'], ['Accept' => 'application/json'])
+            ->assertForbidden();
+    }
 }       
