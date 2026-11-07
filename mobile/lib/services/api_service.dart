@@ -1229,6 +1229,10 @@ String friendlyError(Object e) {
     return 'Could not reach MtaaWorks. Check your internet connection and try again.';
   }
   final text = e.toString().replaceFirst('Exception: ', '');
+    if (text == 'Server Error') {
+    return 'The server had a problem. Please try again in a moment.';
+  }
+  
   // Anything that still looks technical gets a plain fallback.
   if (text.contains('Exception') || text.contains('errno') || text.contains('uri=')) {
     return 'Something went wrong. Please try again.';
