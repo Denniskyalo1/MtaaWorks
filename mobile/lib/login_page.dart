@@ -4,6 +4,7 @@ import 'home_page.dart';
 import 'services/api_service.dart';
 import 'landing_page.dart';
 import 'complete_profile_page.dart';
+import 'widgets/inline_error.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  String? _error;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -32,15 +34,14 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email and password.'),
-        ),
-      );
+      setState(() => _error = 'Please enter your email and password.');
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       await ApiService.login(
@@ -57,13 +58,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(e),
-          ),
-        ),
-      );
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -74,7 +69,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _loginWithGoogle() async {
     if (_isLoading || _isGoogleLoading) return;
 
-    setState(() => _isGoogleLoading = true);
+    setState(() {
+      _isGoogleLoading = true;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.loginWithGoogle();
@@ -102,13 +100,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(e),
-          ),
-        ),
-      );
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) {
         setState(() => _isGoogleLoading = false);
@@ -286,6 +278,11 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 28),
 
+              if (_error != null) ...[
+                InlineError(_error!),
+                const SizedBox(height: 16),
+              ],
+
               // Log In Button
               Container(
                 height: 54,
@@ -426,4 +423,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

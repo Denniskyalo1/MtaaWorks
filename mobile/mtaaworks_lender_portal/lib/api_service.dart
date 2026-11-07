@@ -393,7 +393,7 @@ String friendlyError(Object e) {
   if (e is http.ClientException) {
     return 'Could not reach MtaaWorks. Check your internet connection and try again.';
   }
-  final text = friendlyError(e);
+  final text = e.toString().replaceFirst('Exception: ', '');
   if (text.contains('Exception') || text.contains('errno') || text.contains('uri=')) {
     return 'Something went wrong. Please try again.';
   }

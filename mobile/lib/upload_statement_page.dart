@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mtaaworks/score_result_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'services/api_service.dart';
+import 'widgets/inline_error.dart';
 
 
 const Color _purple = Color(0xFF7C3AED);
@@ -31,6 +32,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
   final List<_StatementEntry> _entries = [];
   bool _scoring = false;
   int _step = 0;
+  String? _error;
 
   bool get _canSubmit =>
       _entries.isNotEmpty &&
@@ -101,6 +103,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
     setState(() {
       _scoring = true;
       _step = 0;
+      _error = null;
     });
 
     try {
@@ -132,14 +135,8 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(e),
-          ),
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      setState(() => _error = '${friendlyError(e)}\n\n'
+          'Your statements are still selected. Tap "Score my statements" to try again.');
     } finally {
       if (mounted) {
         setState(() => _scoring = false);
@@ -304,37 +301,47 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
             color: Colors.white,
             border: Border(top: BorderSide(color: Colors.grey.shade200)),
           ),
-          child: Container(
-            height: 54,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(27),
-              gradient: LinearGradient(
-                colors: _canSubmit
-                    ? const [Color(0xFF2C2C2E), Color(0xFF000000)]
-                    : [Colors.grey.shade400, Colors.grey.shade400],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: ElevatedButton(
-              onPressed: _canSubmit ? _runDemoScoring : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                disabledBackgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) ...[
+                InlineError(_error!),
+                const SizedBox(height: 12),
+              ],
+              Container(
+                height: 54,
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(27),
+                  gradient: LinearGradient(
+                    colors: _canSubmit
+                        ? const [Color(0xFF2C2C2E), Color(0xFF000000)]
+                        : [Colors.grey.shade400, Colors.grey.shade400],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: ElevatedButton(
+                  onPressed: _canSubmit ? _runDemoScoring : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    disabledBackgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(27),
+                    ),
+                  ),
+                  child: const Text(
+                    'Score my statements',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-              child: const Text(
-                'Score my statements',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            ],
           ),
         ),
       ],
