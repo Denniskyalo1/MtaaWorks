@@ -1,0 +1,29 @@
+name: ios-ipa-build
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: mobile
+      - name: Create .env
+        run: echo "GOOGLE_CLIENT_ID=placeholder" > .env
+        working-directory: mobile
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --dart-define=API_BASE_URL=https://kyalospc.tail56bcf2.ts.net/api
+        working-directory: mobile
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r MtaaWorks.ipa Payload
+        working-directory: mobile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MtaaWorks-ipa
+          path: mobile/MtaaWorks.ipa
