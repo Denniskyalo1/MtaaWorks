@@ -24,6 +24,26 @@ class GoogleAuthController extends Controller
         // 1. Verify the token with Google
         $client = new Client(['client_id' => config('services.google.client_id')]);
 
+        $idToken = $request->input('id_token');
+$parts = explode('.', $idToken);
+
+$claims = count($parts) === 3
+    ? json_decode(
+        base64_decode(strtr($parts[1], '-_', '+/')),
+        true
+    )
+    : [];
+
+Log::info('Google token diagnostics', [
+    'aud' => $claims['aud'] ?? null,
+    'azp' => $claims['azp'] ?? null,
+    'iss' => $claims['iss'] ?? null,
+    'exp' => $claims['exp'] ?? null,
+    'iat' => $claims['iat'] ?? null,
+    'email_verified' => $claims['email_verified'] ?? null,
+    'expected_client_id' => config('services.google.client_id'),
+]);
+
            try {
        $payload = $client->verifyIdToken($request->input('id_token'));
    } catch (\Throwable $e) {
