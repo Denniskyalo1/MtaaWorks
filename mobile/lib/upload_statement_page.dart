@@ -32,7 +32,10 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
   final List<_StatementEntry> _entries = [];
   bool _scoring = false;
   int _step = 0;
+  double _uploadProgress = 0;
   String? _error;
+
+  bool get _uploading => _uploadProgress < 1;
 
   bool get _canSubmit =>
       _entries.isNotEmpty &&
@@ -103,6 +106,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
     setState(() {
       _scoring = true;
       _step = 0;
+      _uploadProgress = 0;
       _error = null;
     });
 
@@ -110,6 +114,14 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
       final response = await ApiService.scoreStatements(
         statementPaths: _entries.map((e) => e.file.path!).toList(),
         passwords: _entries.map((e) => e.password.text).toList(),
+        onProgress: (sent, total) {
+          if (!mounted || total <= 0) return;
+          final p = (sent / total).clamp(0.0, 1.0);
+          // rebuild only when the whole-percent value changes
+          if ((p * 100).floor() != (_uploadProgress * 100).floor()) {
+            setState(() => _uploadProgress = p);
+          }
+        },
       );
 
       final scoreData = response['score'];
@@ -515,7 +527,7 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
           ),
           const SizedBox(height: 28),
           Text(
-            'Reading your statement',
+             _uploading ? 'Uploading your statements' : 'Reading your statement',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: width * 0.065,
@@ -525,7 +537,9 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'This can take up to 3 minutes. \n Please keep the app open.',
+             _uploading
+                ? 'Please keep the app open until the upload finishes.'
+                : 'This usually takes less than a minute.\nPlease keep the app open.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: width * 0.038,
@@ -533,14 +547,34 @@ class _UploadStatementPageState extends State<UploadStatementPage> {
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 32),
-          _ProgressStep(label: 'Opening the file', index: 0, current: _step),
-          _ProgressStep(
-              label: 'Reading your transactions', index: 1, current: _step),
-          _ProgressStep(
-              label: 'Checking the statement totals', index: 2, current: _step),
-          _ProgressStep(
-              label: 'Calculating your score', index: 3, current: _step),
+                    const SizedBox(height: 32),
+          if (_uploading) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: _uploadProgress,
+                minHeight: 10,
+                backgroundColor: _purpleSoft,
+                color: _purple,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${(_uploadProgress * 100).floor()}% uploaded',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ] else ...[
+            _ProgressStep(label: 'Opening the file', index: 0, current: _step),
+            _ProgressStep(
+                label: 'Reading your transactions', index: 1, current: _step),
+            _ProgressStep(
+                label: 'Checking the statement totals',
+                index: 2,
+                current: _step),
+            _ProgressStep(
+                label: 'Calculating your score', index: 3, current: _step),
+          ],
         ],
       ),
     );

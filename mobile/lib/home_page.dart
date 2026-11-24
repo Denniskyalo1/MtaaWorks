@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:mtaaworks/profile_page.dart';
+import 'package:mtaaworks/score_result_page.dart';
+import 'package:mtaaworks/upload_statement_page.dart';
 import 'lender_requests_page.dart';
 import 'consent_page.dart';
 import 'loan_pages.dart';
@@ -32,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   double? _score;
   String? _tier;
   String? _lastScored;
+  Map<String, dynamic>? _scoreData;
   bool _isLoadingScore = true;
   String? _scoreError;
 
@@ -145,9 +148,10 @@ class _HomePageState extends State<HomePage> {
 
       if (scoreData is! Map<String, dynamic>) {
         setState(() {
-          _score = null;
+           _score = null;
           _tier = null;
           _lastScored = null;
+          _scoreData = null;
           _scoreError = null;
           _isLoadingScore = false;
         });
@@ -166,6 +170,7 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         _score = parsedScore;
+        _scoreData = scoreData;
         _tier = scoreData['risk_tier']?.toString();
 
         _lastScored = parsedDate == null
@@ -187,6 +192,7 @@ class _HomePageState extends State<HomePage> {
         _score = null;
         _tier = null;
         _lastScored = null;
+        _scoreData = null;
         _scoreError =
             friendlyError(e);
         _isLoadingScore = false;
@@ -194,6 +200,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+
+   Future<void> _openScore() async {
+    final data = _scoreData;
+
+    if (data == null) {
+      // no score yet: go and get one, then refresh the home page
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const UploadStatementPage()),
+      );
+      if (mounted) _loadLatestScore();
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ScoreResultPage(scoreData: data)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,8 +237,10 @@ class _HomePageState extends State<HomePage> {
           isLoadingScore: _isLoadingScore,
           scoreError: _scoreError,
           onRetryScore: _loadLatestScore,
+          onOpenScore: _openScore,
           consentActive: _activity?.consentActive,
           pendingRequests: _activity?.pendingRequests,
+          loanPending: _activity?.loanPending,
           activity: _activity?.items ?? const [],
           isLoadingActivity: _isLoadingActivity,
           unreadCount: _activity?.unreadSince(_notificationsSeenAt) ?? 0,
@@ -268,6 +295,7 @@ class _HomeBody extends StatelessWidget {
     required this.isLoadingScore,
     required this.scoreError,
     required this.onRetryScore,
+    required this.onOpenScore,
     required this.consentActive,
     required this.pendingRequests,
     required this.activity,
@@ -276,20 +304,20 @@ class _HomeBody extends StatelessWidget {
     required this.onRefresh,
     required this.onOpenNotifications,
     required this.onOpenTarget,
+    this.loanPending,
   });
 
   final String userName;
   final bool isLoadingProfile;
   final String? profileError;
   final Future<void> Function() onRetryProfile;
-
   final double? score;
   final String? tier;
   final String? lastScored;
   final bool isLoadingScore;
   final String? scoreError;
   final Future<void> Function() onRetryScore;
-
+  final VoidCallback onOpenScore;
   final bool? consentActive;
   final int? pendingRequests;
   final List<ActivityItem> activity;
@@ -298,6 +326,7 @@ class _HomeBody extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onOpenNotifications;
   final Future<void> Function(ActivityTarget?) onOpenTarget;
+  final int? loanPending;
 
   /// Opens a page, then refreshes Home when the borrower comes back.
   Future<void> _push(BuildContext context, Widget page) async {
@@ -450,7 +479,10 @@ class _HomeBody extends StatelessWidget {
             ),
             child: (!isLoadingScore && score == null && scoreError == null)
                 ? _FirstScoreGuide(consentActive: consentActive)
-                : Column(
+                                : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: (isLoadingScore || score == null) ? null : onOpenScore,
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -536,14 +568,33 @@ class _HomeBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text(
+                                Text(
                   lastScored ?? 'No score recorded yet',
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 12,
                   ),
                 ),
+                if (!isLoadingScore && score != null) ...[
+                  const SizedBox(height: 10),
+                  const Row(
+                    children: [
+                      Text(
+                        'Tap to see how your score is explained',
+                        style: TextStyle(
+                          color: Color(0xFFA78BFA),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded,
+                          size: 16, color: Color(0xFFA78BFA)),
+                    ],
+                  ),
+                ],
               ],
+            ),
             ),
           ),
 
@@ -593,54 +644,27 @@ class _HomeBody extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          SizedBox(
-            height: 54,
-            child: OutlinedButton.icon(
-              onPressed: () => _push(context, const LoanRequestsPage()),
-              icon: const Icon(Icons.request_quote_outlined, color: _purple),
-              label: const Text(
-                'Loan requests',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _purple,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: _purple, width: 1.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(27),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
+                     Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _push(context, const ScoreHistoryPage()),
-                  icon: const Icon(Icons.show_chart_rounded, color: _purple),
-                  label: const Text('Score history', style: TextStyle(color: _purple)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _purple, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                child: SizedBox(
+                  height: 84,
+                  child: _QuickTile(
+                    icon: Icons.request_quote_outlined,
+                    label: 'Loan requests',
+                    badge: loanPending,
+                    onTap: () => _push(context, const LoanRequestsPage()),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _push(context, const AccessHistoryPage()),
-                  icon: const Icon(Icons.visibility_outlined, color: _purple),
-                  label: const Text('Who viewed', style: TextStyle(color: _purple)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: _purple, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                child: SizedBox(
+                  height: 84,
+                  child: _QuickTile(
+                    icon: Icons.show_chart_rounded,
+                    label: 'Score history',
+                    onTap: () => _push(context, const ScoreHistoryPage()),
                   ),
                 ),
               ),
@@ -649,22 +673,31 @@ class _HomeBody extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          SizedBox(
-            height: 54,
-            child: OutlinedButton.icon(
-              onPressed: () => _push(context, const ReportPage()),
-              icon: const Icon(Icons.picture_as_pdf_rounded, color: _purple),
-              label: const Text(
-                'Credit report (PDF)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _purple),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 84,
+                  child: _QuickTile(
+                    icon: Icons.visibility_outlined,
+                    label: 'Who viewed',
+                    onTap: () => _push(context, const AccessHistoryPage()),
+                  ),
+                ),
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: _purple, width: 1.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 84,
+                  child: _QuickTile(
+                    icon: Icons.picture_as_pdf_rounded,
+                    label: 'Credit report',
+                    onTap: () => _push(context, const ReportPage()),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-
           const SizedBox(height: 24),
 
           Row(
@@ -1078,6 +1111,76 @@ class _GuideStep extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+class _QuickTile extends StatelessWidget {
+  const _QuickTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.badge,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final int? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: _purple.withValues(alpha: 0.35), width: 1.2),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: _purple, size: 26),
+                if (badge != null && badge! > 0)
+                  Positioned(
+                    right: -12,
+                    top: -8,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$badge',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _purple,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

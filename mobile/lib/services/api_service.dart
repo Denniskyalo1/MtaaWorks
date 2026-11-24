@@ -288,9 +288,10 @@ class ApiService {
 
   /// Scores one statement (the same call as before) or several together.
   /// [passwords] must have one entry for each path, in the same order.
-  static Future<Map<String, dynamic>> scoreStatements({
+    static Future<Map<String, dynamic>> scoreStatements({
     required List<String> statementPaths,
     required List<String> passwords,
+    void Function(int sent, int total)? onProgress,
   }) async {
     final token = await getToken();
 
@@ -302,9 +303,10 @@ class ApiService {
       throw Exception('Add a password for each statement.');
     }
 
-    final request = http.MultipartRequest(
+    final request = _ProgressMultipartRequest(
       'POST',
       Uri.parse('$baseUrl/scores'),
+      onProgress: onProgress,
     );
 
     request.headers.addAll({
@@ -326,14 +328,27 @@ class ApiService {
       }
     }
 
-    final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 130),
-      onTimeout: () {
-        throw Exception(
-          'Scoring timed out. Please try again.',
-        );
-      },
-    );
+    http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await request.send().timeout(
+        const Duration(seconds: 130),
+        onTimeout: () {
+          throw TimeoutException('Scoring timed out.');
+        },
+      );
+    } on TimeoutException {
+      throw Exception(
+        'The upload took too long. Check your connection.',
+      );
+    } on SocketException {
+      throw Exception(
+        'Connection lost during upload. Check your connection.',
+      );
+    } on http.ClientException {
+      throw Exception(
+        'Connection lost during upload. Check your connection.',
+      );
+    }
 
     final response = await http.Response.fromStream(streamedResponse);
 
@@ -1238,4 +1253,29 @@ String friendlyError(Object e) {
     return 'Something went wrong. Please try again.';
   }
   return text;
+}
+
+class _ProgressMultipartRequest extends http.MultipartRequest {
+  final void Function(int sent, int total)? onProgress;
+
+  _ProgressMultipartRequest(super.method, super.url, {this.onProgress});
+
+  @override
+  http.ByteStream finalize() {
+    final byteStream = super.finalize();
+    final total = contentLength;
+    var sent = 0;
+
+    final stream = byteStream.transform<List<int>>(
+      StreamTransformer.fromHandlers(
+        handleData: (data, sink) {
+          sent += data.length;
+          onProgress?.call(sent, total);
+          sink.add(data);
+        },
+      ),
+    );
+
+    return http.ByteStream(stream);
+  }
 }

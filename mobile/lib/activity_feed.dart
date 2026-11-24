@@ -30,6 +30,7 @@ class ActivitySnapshot {
   const ActivitySnapshot({
     required this.consentActive,
     required this.pendingRequests,
+    this.loanPending,
     required this.items,
   });
 
@@ -38,6 +39,7 @@ class ActivitySnapshot {
 
   /// Null when the requests could not be loaded.
   final int? pendingRequests;
+  final int? loanPending;
 
   /// Newest first.
   final List<ActivityItem> items;
@@ -198,9 +200,16 @@ class ActivityFeed {
 
     items.sort((a, b) => b.when.compareTo(a.when));
 
+        final int? loanPending = results[2].containsKey('loan_requests')
+        ? _list(results[2], 'loan_requests')
+            .where((l) => l['status'] == 'pending')
+            .length
+        : null;
+
     return ActivitySnapshot(
       consentActive: consentActive,
       pendingRequests: pending,
+      loanPending: loanPending,
       items: items,
     );
   }
