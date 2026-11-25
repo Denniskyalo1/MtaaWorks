@@ -180,8 +180,10 @@ print("\nModel saved to models/credit_model.pkl")
 val_proba = calibrated_model.predict_proba(X_val)[:, 1]
 val_scores = (1 - val_proba) * 100  # higher score = safer
 
-tier_1_cutoff = np.percentile(val_scores, 66)
-tier_2_cutoff = np.percentile(val_scores, 33)
+# Risk-based bands: score = 100 x (1 - calibrated probability of default),
+# so a cutoff of 90 means 10% estimated default risk and 80 means 20%.
+tier_1_cutoff = 90.0
+tier_2_cutoff = 80.0
 print(f"\nTier 1 (safest): score >= {tier_1_cutoff:.1f}")
 print(f"Tier 2: {tier_2_cutoff:.1f} <= score < {tier_1_cutoff:.1f}")
 print(f"Tier 3 (riskiest): score < {tier_2_cutoff:.1f}")

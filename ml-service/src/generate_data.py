@@ -1,6 +1,17 @@
 import numpy as np
 import pandas as pd
 
+# DATA ASSUMPTIONS (state these before quoting any result from this project)
+# - Every borrower and every default label here is SYNTHETIC. No lender, bank or
+#   bureau supplied data, coefficients or default rates.
+# - defaulted = 1 stands for a loan 90 or more days past due, the same convention
+#   the Central Bank of Kenya uses for non-performing loans.
+# - The default_logit coefficients are author-chosen (an "expert scorecard"). Their
+#   signs follow published factors; their magnitudes are assumptions, not estimates
+#   from repayment data.
+# - avg_monthly_inflow, savings_deposit_frequency and transaction_count_monthly
+#   have no direct effect on default by design: the score measures behaviour,
+#   not income level.
 np.random.seed(42)
 N = 5000  # synthetic borrowers
 

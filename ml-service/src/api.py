@@ -155,7 +155,7 @@ def score_values(values: dict) -> ScoreResponse:
     return ScoreResponse(
         probability_of_default=round(p, 4),
         score=score_value,
-        tier=assign_tier((1 - p) * 100),
+        tier=assign_tier(score_value),
         flagged_high_risk=p >= THRESHOLD,
         top_drivers=explain(row),
         out_of_range_features=out_of_range,

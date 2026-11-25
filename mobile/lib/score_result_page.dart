@@ -15,9 +15,9 @@ const Color _amberSoft = Color(0xFFFFF8E8);
 const Color _amberBorder = Color(0xFFFFE2A8);
 const Color _amberText = Color(0xFF7A4F0C);
 
-const String _tier3Range = 'Below 80.2';
-const String _tier2Range = '80.2 – 89.3';
-const String _tier1Range = '89.3 and above';
+const String _tier3Range = 'Below 80';
+const String _tier2Range = '80 – 89.9';
+const String _tier1Range = '90 and above';
 
 
 double? _asDouble(dynamic value) {

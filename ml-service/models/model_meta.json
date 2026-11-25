@@ -13,8 +13,8 @@
     "transaction_count_monthly"
   ],
   "decision_threshold": 0.26,
-  "tier_1_cutoff": 89.34986386331565,
-  "tier_2_cutoff": 80.22437044254059,
+  "tier_1_cutoff": 90.0,
+  "tier_2_cutoff": 80.0,
   "training_ranges": {
     "avg_monthly_inflow": [
       1694.3465880025203,
